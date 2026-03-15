@@ -9,20 +9,24 @@ String jumbledHard = "JBLUME";
 String currentJumble = "";
 
 // SELECTION PAIR
-//
+int selectionOne, selectionTwo = 0;
 
 void setup() {
   // SETUP PINS
   // SET CURRENT JUMBLE TO RANDOM JUMBLE DIFFICULTY
   // SELECTION ONE = 1
   // SELECTION TWO = SELECTION ONE + 1
+
+  selectionOne = 1;
+  selectionTwo = selectionOne + 1;
 }
 
 void ShuffleLetters() {
-  // COPY PAIR.ONE TO CHAR TEMP
-  // SET CURRENT JUMBLE SUBSTRING (PAIR.ONE) TO PAIR.TWO
-  // SET CURRENT JUMBLE SUBSTRING (PAIR.TWO) TO TEMP (PAIR.ONE)
-
+  // copy the current substring to temp, copy the chars of the selected substring in reverse order (e.g. substring(2) + substring(1))
+  // replace original substring with swapped substring
+  String temp = currentJumble.substring(selectionOne, selectionTwo);
+  String newString = currentJumble.substring(selectionTwo, selectionTwo) + currentJumble.substring(selectionOne, selectionOne);
+  currentJumble.replace(temp, newString);
 }
 
 void loop() {
