@@ -8,6 +8,12 @@ String jumbledHard = "JBLUME";
 
 String currentJumble = "";
 
+// PLANNING NOTE:
+// when we eventually separate the games and have our core game management system
+// we should put each game in its own .ino file by creating a new tab and moving all the functionality to there
+// then we create our own setup functions and relevant functions to control game flow
+// e.g. setupJumbleGame()
+
 // SELECTION PAIR
 int selectionOne, selectionTwo = 0;
 
