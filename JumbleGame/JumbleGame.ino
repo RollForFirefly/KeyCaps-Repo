@@ -35,6 +35,10 @@ void ShuffleLetters() {
   currentJumble.replace(temp, newString);
 }
 
+bool CheckJumble() {
+  return currentJumble == STR_JUMBLE;
+}
+
 void loop() {
   // DISPLAY CURRENT JUMBLE
   // DISPLAY SELECTION PAIR
