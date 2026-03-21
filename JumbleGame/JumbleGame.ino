@@ -67,9 +67,9 @@ void ShuffleLetters() {
 
 void UpdateDisplay() {
   if (gameState == PLAY) {
-    String spacer = "      ";               // USING THIS BECAUSE ONLY ONE CURSOR CAN BE WRITTEN TO THE DISPLAY AT A TIME. SO WE'RE USING <> AS A CURSOR. ALTERNATIVELY, WE CAN HAVE IT BLINK?
-    spacer.setCharAt(selectionOne, '<');
-    spacer.setCharAt(selectionTwo, '>');
+    String spacer = "      ";               // USING THIS BECAUSE ONLY ONE CURSOR CAN BE WRITTEN TO THE DISPLAY AT A TIME. SO WE'RE USING ^^ AS A CURSOR. ALTERNATIVELY, WE CAN HAVE IT BLINK?
+    spacer.setCharAt(selectionOne, '^');
+    spacer.setCharAt(selectionTwo, '^');
     String msgToDisplay = currentJumble + "\n" + spacer;
     lcd.print(msgToDisplay);
   }
