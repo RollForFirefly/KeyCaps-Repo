@@ -8,7 +8,7 @@
 #define RIGHT_B_PIN 4
 
 enum GameState {
-  SETUP, PLAY, WIN, LOSE
+  MENU, SETUP, PLAY, WIN, LOSE
 };
 
 rgb_lcd lcd;
@@ -49,12 +49,17 @@ void setup() {
   pinMode(RIGHT_B_PIN, INPUT);
 
   lcd.begin(16, 2);
-  UpdateDisplay();
+  
+  JumbleSetup();
+}
+
+void JumbleSetup() {
+  gameState = PLAY;
 
   selectionOne = 1;
   selectionTwo = selectionOne + 1;
 
-  gameState = PLAY;
+  UpdateDisplay();
 }
 
 void ShuffleLetters() {
@@ -83,37 +88,51 @@ bool CheckJumble() {
 }
 
 void MoveSelection() {
+  selectionOne++;
+  selectionTwo = selectionOne + 1;
 
+  if (selectionOne > 4) {
+    selectionOne = 1;
+    selectionTwo = selectionOne + 1;
+  }
+}
+
+void RestartJumble() {
+  Delay(1000);
+  JumbleSetup();
 }
 
 // We only update the button readings if they are different from the previously recorded ones, to prevent someone from holding down a button.
 void ReadInput() {
   if (int LB = digitalRead(LEFT_B_PIN) != leftButtonState) {
     leftButtonState = LB;
-    if (leftButtonState == HIGH) {
+    if (leftButtonState == HIGH && gameState == PLAY) {
       ShuffleLetters();
+    }
+
+    if (gameState == WIN || gameState == LOSE) {
+      RestartJumble();
     }
   }
 
   if (int RB = digitalRead(RIGHT_B_PIN) != rightButtonState) {
     rightButtonState = RB;
-    if (rightButtonState == HIGH) {
+    if (rightButtonState == HIGH && gameState == PLAY) {
       MoveSelection();
+    }
+
+    if (gameState == WIN || gameState == LOSE) {
+      RestartJumble();
     }
   }
 }
 
 void loop() {
-  UpdateDisplay();
-  ReadInput();
   if (CheckJumble()) {
     gameState = WIN;
   }
 
-  // DISPLAY CURRENT JUMBLE
-  // DISPLAY SELECTION PAIR
-  // AWAIT SELECTION INPUT
-  // AWAIT SHUFFLE INPUT
-  // AFTER SHUFFLE, CHECK CURRENT JUMBLE == STR_JUMBLE
-  // IF TRUE, DISPAY WIN!
+  ReadInput();
+  UpdateDisplay();
+  
 }
