@@ -65,12 +65,15 @@ void JumbleSetup() {
 void ShuffleLetters() {
   // copy the current substring to temp, copy the chars of the selected substring in reverse order (e.g. substring(2) + substring(1))
   // replace original substring with swapped substring
-  String temp = currentJumble.substring(selectionOne, selectionTwo);
-  String newString = currentJumble.substring(selectionTwo, selectionTwo) + currentJumble.substring(selectionOne, selectionOne);
-  currentJumble.replace(temp, newString);
+  char charOne = currentJumble[selectionOne];
+  char charTwo = currentJumble[selectionTwo];
+  currentJumble[selectionOne] = charTwo;
+  currentJumble[selectionTwo] = charOne;
 }
 
+// updates the display to the newly jumbled word and changes the "cursor" position to match player input. If the game has been won, prints a win state to the screen.
 void UpdateDisplay() {
+  lcd.clear();
   if (gameState == PLAY) {
     String spacer = "      ";               // USING THIS BECAUSE ONLY ONE CURSOR CAN BE WRITTEN TO THE DISPLAY AT A TIME. SO WE'RE USING ^^ AS A CURSOR. ALTERNATIVELY, WE CAN HAVE IT BLINK?
     spacer.setCharAt(selectionOne, '^');
@@ -91,6 +94,7 @@ void MoveSelection() {
   selectionOne++;
   selectionTwo = selectionOne + 1;
 
+  // prevents the J or E of jumble from being moved. We can do away with this if we don't like it.
   if (selectionOne > 4) {
     selectionOne = 1;
     selectionTwo = selectionOne + 1;
@@ -98,13 +102,14 @@ void MoveSelection() {
 }
 
 void RestartJumble() {
-  Delay(1000);
+  delay(1000);
   JumbleSetup();
 }
 
 // We only update the button readings if they are different from the previously recorded ones, to prevent someone from holding down a button.
 void ReadInput() {
-  if (int LB = digitalRead(LEFT_B_PIN) != leftButtonState) {
+  int LB = digitalRead(LEFT_B_PIN);
+  if (LB != leftButtonState) {
     leftButtonState = LB;
     if (leftButtonState == HIGH && gameState == PLAY) {
       ShuffleLetters();
@@ -115,7 +120,8 @@ void ReadInput() {
     }
   }
 
-  if (int RB = digitalRead(RIGHT_B_PIN) != rightButtonState) {
+  int RB = digitalRead(RIGHT_B_PIN);
+  if (RB != rightButtonState) {
     rightButtonState = RB;
     if (rightButtonState == HIGH && gameState == PLAY) {
       MoveSelection();
@@ -128,7 +134,7 @@ void ReadInput() {
 }
 
 void loop() {
-  if (CheckJumble()) {
+  if (CheckJumble() && gameState != WIN) {
     gameState = WIN;
   }
 
