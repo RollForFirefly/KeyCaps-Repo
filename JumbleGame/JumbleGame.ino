@@ -22,21 +22,12 @@ String spacer = "";
 
 GameState gameState = SETUP;
 
-// PLANNING NOTE:
-// when we eventually separate the games and have our core game management system
-// we should put each game in its own .ino file by creating a new tab and moving all the functionality to there
-// then we create our own setup functions and relevant functions to control game flow
-// e.g. setupJumbleGame()
-
 // SELECTION PAIR
 int selectionOne, selectionTwo = 0;
 int leftButtonState, rightButtonState = 0;
 
 void setup() {
-  // SETUP PINS
-  // SET CURRENT JUMBLE TO RANDOM JUMBLE DIFFICULTY
-  // SELECTION ONE = 1
-  // SELECTION TWO = SELECTION ONE + 1
+  // Set random jumble word
   int rand = random(0, 3);
   switch (rand) {
     case 0: currentJumble = jumbledEasy; break;
@@ -45,9 +36,11 @@ void setup() {
     default: currentJumble = jumbledEasy; break;
   }
 
+  // Pin setup
   pinMode(LEFT_B_PIN, INPUT);
   pinMode(RIGHT_B_PIN, INPUT);
 
+  // LCD setup
   lcd.begin(16, 2);
   
   JumbleSetup();
@@ -63,8 +56,7 @@ void JumbleSetup() {
 }
 
 void ShuffleLetters() {
-  // copy the current substring to temp, copy the chars of the selected substring in reverse order (e.g. substring(2) + substring(1))
-  // replace original substring with swapped substring
+  // swaps letter one with letter two
   char charOne = currentJumble[selectionOne];
   char charTwo = currentJumble[selectionTwo];
   currentJumble[selectionOne] = charTwo;
