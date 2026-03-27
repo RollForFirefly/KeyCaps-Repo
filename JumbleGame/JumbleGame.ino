@@ -1,14 +1,17 @@
-// JUMBLE GAME
-
 #include <Wire.h>
 #include "rgb_lcd.h"
 
 #define STR_JUMBLE "JUMBLE"
-#define LEFT_B_PIN 3
-#define RIGHT_B_PIN 4
+#define LEFT_B_PIN 7
+#define RIGHT_B_PIN 8
 
-enum GameState {
-  MENU, SETUP, PLAY, WIN, LOSE
+enum GameState
+{
+  MENU,
+  SETUP,
+  PLAY,
+  WIN,
+  LOSE
 };
 
 rgb_lcd lcd;
@@ -18,121 +21,194 @@ String jumbledMedium = "JLMUBE";
 String jumbledHard = "JBLUME";
 
 String currentJumble = "";
-String spacer = "";
-
 GameState gameState = SETUP;
 
-// PLANNING NOTE:
-// when we eventually separate the games and have our core game management system
-// we should put each game in its own .ino file by creating a new tab and moving all the functionality to there
-// then we create our own setup functions and relevant functions to control game flow
-// e.g. setupJumbleGame()
-
 // SELECTION PAIR
-int selectionOne, selectionTwo = 0;
-int leftButtonState, rightButtonState = 0;
+int selectionOne = 0;
+int selectionTwo = 1;
+int leftButtonState = 0;
+int rightButtonState = 0;
 
-void setup() {
-  // SETUP PINS
-  // SET CURRENT JUMBLE TO RANDOM JUMBLE DIFFICULTY
-  // SELECTION ONE = 1
-  // SELECTION TWO = SELECTION ONE + 1
-  int rand = random(0, 3);
-  switch (rand) {
-    case 0: currentJumble = jumbledEasy; break;
-    case 1: currentJumble = jumbledMedium; break;
-    case 2: currentJumble = jumbledHard; break;
-    default: currentJumble = jumbledEasy; break;
-  }
+// Track previous state to reduce unnecessary LCD updates
+String lastDisplay = "";
+GameState lastGameState = SETUP;
 
+// --- Forward declarations ---
+void UpdateDisplay(bool force = false);
+void JumbleSetup();
+void ShuffleLetters();
+void MoveSelection();
+void RestartJumble();
+void ReadInput();
+bool CheckJumble();
+
+void setup()
+{
   pinMode(LEFT_B_PIN, INPUT);
   pinMode(RIGHT_B_PIN, INPUT);
 
   lcd.begin(16, 2);
-  
+  Serial.begin(9600);
+
+  // Choose a random jumble
+  int randNum = random(0, 3);
+  switch (randNum)
+  {
+  case 0:
+    currentJumble = jumbledEasy;
+    break;
+  case 1:
+    currentJumble = jumbledMedium;
+    break;
+  case 2:
+    currentJumble = jumbledHard;
+    break;
+  default:
+    currentJumble = jumbledEasy;
+    break;
+  }
+
+  Serial.print("Initial jumble: ");
+  Serial.println(currentJumble);
   JumbleSetup();
 }
 
-void JumbleSetup() {
+void JumbleSetup()
+{
   gameState = PLAY;
-
-  selectionOne = 1;
+  selectionOne = 0;
   selectionTwo = selectionOne + 1;
 
-  UpdateDisplay();
+  UpdateDisplay(true);
 }
 
-void ShuffleLetters() {
-  // copy the current substring to temp, copy the chars of the selected substring in reverse order (e.g. substring(2) + substring(1))
-  // replace original substring with swapped substring
-  String temp = currentJumble.substring(selectionOne, selectionTwo);
-  String newString = currentJumble.substring(selectionTwo, selectionTwo) + currentJumble.substring(selectionOne, selectionOne);
-  currentJumble.replace(temp, newString);
+void ShuffleLetters()
+{
+  char a = currentJumble[selectionOne];
+  char b = currentJumble[selectionTwo];
+
+  currentJumble.setCharAt(selectionOne, b);
+  currentJumble.setCharAt(selectionTwo, a);
+
+  Serial.print("Shuffled letters: ");
+  Serial.println(currentJumble);
 }
 
-void UpdateDisplay() {
-  if (gameState == PLAY) {
-    String spacer = "      ";               // USING THIS BECAUSE ONLY ONE CURSOR CAN BE WRITTEN TO THE DISPLAY AT A TIME. SO WE'RE USING ^^ AS A CURSOR. ALTERNATIVELY, WE CAN HAVE IT BLINK?
+void UpdateDisplay(bool force)
+{
+  lcd.clear();
+
+  if (gameState == PLAY)
+  {
+    // First line: current jumble
+    lcd.setCursor(0, 0);
+    lcd.print(currentJumble);
+
+    // Second line: cursor indicators
+    String spacer = "";
+    for (int i = 0; i < currentJumble.length(); i++)
+      spacer += " "; // initialize with spaces
     spacer.setCharAt(selectionOne, '^');
     spacer.setCharAt(selectionTwo, '^');
-    String msgToDisplay = currentJumble + "\n" + spacer;
-    lcd.print(msgToDisplay);
+
+    lcd.setCursor(0, 1);
+    lcd.print(spacer);
   }
-  else if (gameState == WIN) {
+  else if (gameState == WIN)
+  {
+    lcd.setCursor(0, 0);
     lcd.print("YOU WIN!");
   }
+  else if (gameState == LOSE)
+  {
+    lcd.setCursor(0, 0);
+    lcd.print("YOU LOSE!");
+  }
+
+  lastDisplay = currentJumble; // optional tracking
+  lastGameState = gameState;
 }
 
-bool CheckJumble() {
+bool CheckJumble()
+{
   return currentJumble == STR_JUMBLE;
 }
 
-void MoveSelection() {
+void MoveSelection()
+{
   selectionOne++;
   selectionTwo = selectionOne + 1;
 
-  if (selectionOne > 4) {
-    selectionOne = 1;
+  if (selectionOne >= currentJumble.length() - 1)
+  {
+    selectionOne = 0;
     selectionTwo = selectionOne + 1;
   }
+
+  Serial.print("Selection moved to: ");
+  Serial.print(selectionOne);
+  Serial.print(", ");
+  Serial.println(selectionTwo);
 }
 
-void RestartJumble() {
-  Delay(1000);
+void RestartJumble()
+{
+  delay(1000);
   JumbleSetup();
 }
 
-// We only update the button readings if they are different from the previously recorded ones, to prevent someone from holding down a button.
-void ReadInput() {
-  if (int LB = digitalRead(LEFT_B_PIN) != leftButtonState) {
+void ReadInput()
+{
+  int LB = digitalRead(LEFT_B_PIN);
+  int RB = digitalRead(RIGHT_B_PIN);
+
+  if (LB != leftButtonState)
+  {
     leftButtonState = LB;
-    if (leftButtonState == HIGH && gameState == PLAY) {
+    Serial.print("Left button state: ");
+    Serial.println(leftButtonState);
+
+    if (leftButtonState == HIGH && gameState == PLAY)
+    {
       ShuffleLetters();
+      UpdateDisplay();
     }
 
-    if (gameState == WIN || gameState == LOSE) {
+    if ((gameState == WIN || gameState == LOSE) && leftButtonState == HIGH)
+    {
+      Serial.println("Restarting game from left button...");
       RestartJumble();
     }
   }
 
-  if (int RB = digitalRead(RIGHT_B_PIN) != rightButtonState) {
+  if (RB != rightButtonState)
+  {
     rightButtonState = RB;
-    if (rightButtonState == HIGH && gameState == PLAY) {
+    Serial.print("Right button state: ");
+    Serial.println(rightButtonState);
+
+    if (rightButtonState == HIGH && gameState == PLAY)
+    {
       MoveSelection();
+      UpdateDisplay();
     }
 
-    if (gameState == WIN || gameState == LOSE) {
+    if ((gameState == WIN || gameState == LOSE) && rightButtonState == HIGH)
+    {
+      Serial.println("Restarting game from right button...");
       RestartJumble();
     }
   }
 }
 
-void loop() {
-  if (CheckJumble()) {
+void loop()
+{
+  if (CheckJumble() && gameState != WIN)
+  {
     gameState = WIN;
+    Serial.println("Jumble solved! You win!");
+    UpdateDisplay();
   }
 
   ReadInput();
-  UpdateDisplay();
-  
 }
