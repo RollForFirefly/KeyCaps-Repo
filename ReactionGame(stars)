@@ -1,0 +1,96 @@
+#include <Wire.h>
+#include <rgb_lcd.h>
+
+rgb_lcd lcd;
+
+const int buttonPin = 2;
+unsigned long startTime;
+const int maxTime = 800;    // Reaction window
+int compteur = 0;
+
+void setup() {
+  lcd.begin(16, 2);
+  pinMode(buttonPin, INPUT_PULLUP);
+  randomSeed(analogRead(0));
+  
+  lcd.setCursor(0, 0);
+  lcd.print("Reaction Game!");
+  lcd.setCursor(0, 1);
+  lcd.print("Press to start");
+
+  // --- WAIT FOR USER TO PRESS BUTTON TO START ---
+  while(digitalRead(buttonPin) == HIGH) {
+    // Stay here until button is pressed (LOW)
+  }
+  
+  lcd.clear();
+  lcd.print("Starting...");
+  delay(1000);
+}
+
+void loop() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Get Ready...");
+  lcd.setCursor(0, 1);
+  lcd.print("Score: ");
+  lcd.print(compteur);
+
+  delay(random(1500, 3500));
+
+  bool trap = (random(0, 3) == 1); 
+  
+  lcd.clear();
+  lcd.setCursor(7, 0);
+  lcd.print(trap ? "**" : "*"); 
+
+  startTime = millis();
+  bool pressed = false;
+  unsigned long reactionTime = 0;
+  
+  // Detection window
+  while (millis() - startTime < maxTime) {
+    if (digitalRead(buttonPin) == LOW) {
+      if (!pressed) {
+        reactionTime = millis() - startTime;
+        pressed = true;
+      }
+    }
+  }
+
+  // Small delay before showing the result for better readability
+  delay(400); 
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+
+  if (trap) {
+    if (pressed) {
+      lcd.print("Trap! Lost");
+      compteur = 0;
+    } else {
+      delay(300); 
+      lcd.print("Good! Safe");
+    }
+  } else {
+    if (pressed) {
+      compteur++;
+      lcd.print("Ok! ");
+    } else {
+      delay(300);
+      lcd.print("Too slow!");
+      compteur = 0;
+    }
+  }
+
+  if (compteur >= 5) {
+    lcd.setCursor(0, 1);
+    lcd.print("YOU WIN!");
+    delay(3000);
+    compteur = 0;
+  }
+
+  // Wait for button release to avoid skipping rounds
+  while(digitalRead(buttonPin) == LOW); 
+  delay(1500); 
+}
