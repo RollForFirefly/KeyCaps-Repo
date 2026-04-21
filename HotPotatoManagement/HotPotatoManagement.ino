@@ -49,11 +49,25 @@ void SetUpGame() {
 
 }
 
-void GameLoop() {
+void MenuLoop() {
+  // await user input to start
+}
 
+void GameLoop() {
+  // increment timer
+  // play game
+}
+
+void ExplosionLoop() {
+  // play explode sfx
+  // await user input (continue, exit)
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  
+  // if (menu): MenuLoop()
+  // elif (game) GameLoop()
+  // elif (timer == 0) BlowUpScreen()
 
 }

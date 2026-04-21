@@ -26,15 +26,15 @@ int startMelody[] = {
 };
 
 int startDuration[] = {
-  4, 4, 8
+  8, 8, 8
 };
 
 int victoryMelody[] = {
-  NOTE_E6, NOTE_F6, REST, NOTE_E6, NOTE_F6
+  NOTE_D6, NOTE_F6, 0, NOTE_D6, NOTE_F6
 };
 
 int victoryDuration[] = {
-  4, 4, 4, 4, 8
+  8, 8, 8, 8, 8
 };
 
 int dur = 1000;   // 1000ms, to be divided by the duration of notes when played
@@ -58,7 +58,7 @@ GameState gameState = SETUP;
 
 // SELECTION PAIR
 int selectionOne = 1;
-int selectionTwo = []() { return selectionOne + 1; };
+int selectionTwo = 2;
 int leftButtonState = 0;
 int rightButtonState = 0;
 
@@ -129,7 +129,8 @@ void JumbleSetup()
   numLeftPressesUnbroken = 0;
 
   UpdateDisplay();
-  PlayMelody(startMelody, startDuration);
+  int startLen = sizeof(startMelody) / sizeof(int);
+  PlayMelody(startMelody, startDuration, startLen);
 }
 
 void ShuffleLetters()
@@ -185,10 +186,12 @@ bool CheckJumble()
 void MoveSelection()
 {
   selectionOne++;
+  selectionTwo = selectionOne + 1;
 
-  if (selectionOne >= currentJumble.length() - 1)
+  if (selectionTwo >= currentJumble.length() - 1)
   {
     selectionOne = 1;
+    selectionTwo = selectionOne + 1;
   }
 
   PlayTune(MOVE_TUNE);
@@ -252,13 +255,13 @@ void PlayTune(JumbleTunes jumbleTune) {
   tone(BUZZ_PIN, (int) jumbleTune, dur / tuneDuration);
 }
 
-void PlayMelody(int melody[], int duration[]) {
-  int len = sizeof(melody) / sizeof(byte);
+void PlayMelody(int melody[], int duration[], int len) {
   for (int i = 0; i < len; i++) {
     tone(BUZZ_PIN, melody[i], dur / duration[i]);
 
     int pauseBetweenNotes =  dur / duration[i] * 1.30;
     delay(pauseBetweenNotes);
+    noTone(BUZZ_PIN);
   }
 }
 
@@ -269,7 +272,9 @@ void loop()
     gameState = WIN;
     DebugJumble(isDebug, "Game has been won.");
     UpdateDisplay();
-    PlayMelody(victoryMelody, victoryDuration);
+
+    int vicLen = sizeof(victoryMelody) / sizeof(int);
+    PlayMelody(victoryMelody, victoryDuration, vicLen);
   }
 
   ReadInput();
