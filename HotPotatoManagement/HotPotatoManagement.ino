@@ -1,6 +1,7 @@
 #include <Wire.h>
-#include "rgb.lcd.h"
+//#include "rgb.lcd.h"
 #include "pitches.h"
+#include "HotPotatoMemory.h"
 
 // some planning thoughts:
 // there are a couple ways we could potentially do this
@@ -17,8 +18,38 @@
 // winning a minigame just results in someone handing the potato off. losing restarts the minigame for that person. 
 // 
 
+enum GameState {
+  MAIN_MENU = 0,
+  JUMBLE_GAME = 1,
+  END_SCREEN = 2,
+};
+
+GameState gameState = MAIN_MENU;
+
 void setup() {
-  // put your setup code here, to run once:
+  
+  // TODO: MAIN SETUP
+
+  // TODO: TEST CROSS-INO ACCESS
+  TestFunc();
+
+  testNum += 1;
+
+  wowee += 1;
+
+}
+
+void SetUpGame() {
+  switch (gameState) {
+    case JUMBLE_GAME:
+    // TODO: stuff
+    break;
+  }
+
+
+}
+
+void GameLoop() {
 
 }
 
