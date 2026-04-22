@@ -1,14 +1,12 @@
 #include <Wire.h>
-//#include "rgb.lcd.h"
+#include "rgb.lcd.h"
 #include "pitches.h"
 #include "HotPotatoMemory.h"
 
-// some planning thoughts:
-// there are a couple ways we could potentially do this
-// we could create a state machine, with a state for the menu, games, and victory screens. states could either have the game within them or just direct logic flow to that game
-// we could make each game its own cpp class and have them inherit from an IGame interface, with functions like Init(), Start(), Repeat(), HandleInput(input A, ...), Display(String lineOne, ...), etc.
-// it may be worthwhile to have a tab/class for shared variables, so that we aren't chewing through the entire memory of the uno. e.g. generic variables like intValOne, strAlpha, uintVar
-// we could (please no) try to cram everything into one ino file. bad idea.
+// some notes for structuring:
+// the games will remain as separate ino files
+// our hot potato manager will call the setup & loop functions of those games when running them. Those functions should be renamed like jumbleSetup(), shakeLoop() so that they don't get automatically called by the arduino
+// (optional) to save on memory, we will have one file for all our variables. Rather than each game defining variables, they will use the ones present in the variable file. 
 
 
 // requirements:
@@ -20,30 +18,31 @@
 
 enum GameState {
   MAIN_MENU = 0,
-  JUMBLE_GAME = 1,
-  END_SCREEN = 2,
+  LOADING_SCREEN = 1,
+  JUMBLE_GAME = 2,
+  END_SCREEN = 3,
 };
+
+rgb_lcd lcd;
 
 GameState gameState = MAIN_MENU;
 
 void setup() {
   
-  // TODO: MAIN SETUP
+  lcd.begin(16, 2);
 
   // TODO: TEST CROSS-INO ACCESS
-  TestFunc();
-
-  testNum += 1;
-
-  wowee += 1;
 
 }
 
 void SetUpGame() {
   switch (gameState) {
     case JUMBLE_GAME:
-    // TODO: stuff
-    break;
+      // CALL SETUP LOGIC FOR THE GAME
+      jumbleSetup();
+      break;
+    default:
+      break;
   }
 
 
@@ -56,18 +55,25 @@ void MenuLoop() {
 void GameLoop() {
   // increment timer
   // play game
+
+  switch (gameState) {
+    case JUMBLE_GAME:
+      jumbleLoop();
+      break;
+  }
 }
 
-void ExplosionLoop() {
-  // play explode sfx
-  // await user input (continue, exit)
+void TransitionToGameState(GameState newGameState) {
+  // some sort of loading screen?
+  // shouldn't be an instant snap to different games
+  // perhaps screen reads "hand hot potato to the next person" or something similar
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   
-  // if (menu): MenuLoop()
-  // elif (game) GameLoop()
-  // elif (timer == 0) BlowUpScreen()
+  // if (gameState != menu || gameState != endscreen) {
+    // GameLoop();
+  // }
 
 }
