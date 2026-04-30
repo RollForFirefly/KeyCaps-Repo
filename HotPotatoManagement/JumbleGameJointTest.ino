@@ -1,12 +1,3 @@
-#include <Wire.h>
-#include "rgb_lcd.h"
-#include "pitches.h"
-
-#define STR_JUMBLE "JUMBLE"
-#define BUZZ_PIN 6
-#define LEFT_B_PIN 7
-#define RIGHT_B_PIN 8
-
 enum JumbleGameState
 {
   MENU,
@@ -40,8 +31,6 @@ int victoryDuration[] = {
 int dur = 1000;   // 1000ms, to be divided by the duration of notes when played
 int tuneDuration = 4;
 
-rgb_lcd lcd;
-
 bool isDebug = true;
 
 String possibleJumbles[] = {
@@ -54,7 +43,7 @@ String jumbledMedium = "JLMUBE";
 String jumbledHard = "JBLUME";
 
 String currentJumble = "";
-JumbleGameState gameState = SETUP;
+JumbleGameState jumbleState = SETUP;
 
 // SELECTION PAIR
 int selectionOne = 1;
@@ -75,8 +64,9 @@ void ReadInput();
 bool CheckJumble();
 void DebugJumble(bool isDebug, String debugMsg, String debugVar = "");
 void TryUnlockDebugMode();
+void PlayTune(JumbleTunes jumbleTune);
 
-void jumbleSetup()
+void JumbleSetup()
 {
   pinMode(LEFT_B_PIN, INPUT);
   pinMode(RIGHT_B_PIN, INPUT);
@@ -103,7 +93,15 @@ void jumbleSetup()
   }
 
   DebugJumble(isDebug, "Initial jumble: ", currentJumble);
-  JumbleSetup();
+
+  jumbleState = PLAY;
+  selectionOne = 1;
+  selectionTwo = selectionOne + 1;
+  numLeftPressesUnbroken = 0;
+
+  UpdateDisplay();
+  int startLen = sizeof(startMelody) / sizeof(int);
+  PlayMelody(startMelody, startDuration, startLen);
 }
 
 void DebugJumble(bool isDebug, String debugMsg, String debugVar = "") {
@@ -119,18 +117,6 @@ void TryUnlockDebugMode() {
     DebugJumble(true, debugUnlock);
     isDebug = true;
   }
-}
-
-void JumbleSetup()
-{
-  gameState = PLAY;
-  selectionOne = 1;
-  selectionTwo = selectionOne + 1;
-  numLeftPressesUnbroken = 0;
-
-  UpdateDisplay();
-  int startLen = sizeof(startMelody) / sizeof(int);
-  PlayMelody(startMelody, startDuration, startLen);
 }
 
 void ShuffleLetters()
@@ -150,7 +136,7 @@ void UpdateDisplay()
 {
   lcd.clear();
 
-  if (gameState == PLAY)
+  if (jumbleState == PLAY)
   {
     // First line: current jumble
     lcd.setCursor(0, 0);
@@ -166,12 +152,12 @@ void UpdateDisplay()
     lcd.setCursor(0, 1);
     lcd.print(spacer);
   }
-  else if (gameState == WIN)
+  else if (jumbleState == WIN)
   {
     lcd.setCursor(0, 0);
     lcd.print("YOU WIN!");
   }
-  else if (gameState == LOSE)
+  else if (jumbleState == LOSE)
   {
     lcd.setCursor(0, 0);
     lcd.print("YOU LOSE!");
@@ -216,7 +202,7 @@ void ReadInput()
     leftButtonState = LB;
     DebugJumble(isDebug, "Left button state: ", String(leftButtonState));
 
-    if (leftButtonState == HIGH && gameState == PLAY)
+    if (leftButtonState == HIGH && jumbleState == PLAY)
     {
       numLeftPressesUnbroken++;
       TryUnlockDebugMode();
@@ -224,7 +210,7 @@ void ReadInput()
       UpdateDisplay();
     }
 
-    if ((gameState == WIN || gameState == LOSE) && leftButtonState == HIGH)
+    if ((jumbleState == WIN || jumbleState == LOSE) && leftButtonState == HIGH)
     {
       DebugJumble(isDebug, "Restarting game from left button...");
       RestartJumble();
@@ -236,14 +222,14 @@ void ReadInput()
     rightButtonState = RB;
     DebugJumble(isDebug, "Right button state: ", String(rightButtonState));
 
-    if (rightButtonState == HIGH && gameState == PLAY)
+    if (rightButtonState == HIGH && jumbleState == PLAY)
     {
       numLeftPressesUnbroken = 0;
       MoveSelection();
       UpdateDisplay();
     }
 
-    if ((gameState == WIN || gameState == LOSE) && rightButtonState == HIGH)
+    if ((jumbleState == WIN || jumbleState == LOSE) && rightButtonState == HIGH)
     {
       DebugJumble(isDebug, "Restarting game from right button...");
       RestartJumble();
@@ -267,9 +253,9 @@ void PlayMelody(int melody[], int duration[], int len) {
 
 void jumbleLoop()
 {
-  if (CheckJumble() && gameState != WIN)
+  if (CheckJumble() && jumbleState != WIN)
   {
-    gameState = WIN;
+    jumbleState = WIN;
     DebugJumble(isDebug, "Game has been won.");
     UpdateDisplay();
 
