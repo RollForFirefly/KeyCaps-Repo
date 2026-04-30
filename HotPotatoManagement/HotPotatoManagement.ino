@@ -1,5 +1,4 @@
 #include <Wire.h>
-#include "rgb.lcd.h"
 #include "pitches.h"
 #include "HotPotatoMemory.h"
 
@@ -16,14 +15,15 @@
 // winning a minigame just results in someone handing the potato off. losing restarts the minigame for that person. 
 // 
 
+extern void JumbleSetup();
+extern void JumbleLoop();
+
 enum GameState {
   MAIN_MENU = 0,
   LOADING_SCREEN = 1,
   JUMBLE_GAME = 2,
   END_SCREEN = 3,
 };
-
-rgb_lcd lcd;
 
 GameState gameState = MAIN_MENU;
 
@@ -35,11 +35,18 @@ void setup() {
 
 }
 
+void HandleState() {
+  switch (gameState) {
+    case MAIN_MENU:
+      MenuLoop();
+  } 
+}
+
 void SetUpGame() {
   switch (gameState) {
     case JUMBLE_GAME:
       // CALL SETUP LOGIC FOR THE GAME
-      jumbleSetup();
+      JumbleSetup();
       break;
     default:
       break;
@@ -50,6 +57,20 @@ void SetUpGame() {
 
 void MenuLoop() {
   // await user input to start
+  // draw menu to screen
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("HOT POTATO V0.1");
+  lcd.setCursor(0, 1);
+  lcd.print("Press any button...");
+
+  if (HasReceivedInput()) {
+    gameState = GetRandomGame();
+  }
+}
+
+bool HasReceivedInput() {
+  return digitalRead(LEFT_B_PIN) > 0 || digitalRead(RIGHT_B_PIN) > 0;
 }
 
 void GameLoop() {
@@ -63,6 +84,13 @@ void GameLoop() {
   }
 }
 
+GameState GetRandomGame() {
+  int minVal = JUMBLE_GAME;
+  int maxVal = JUMBLE_GAME + 1;
+  int randVal = random(minVal, maxVal);
+  return (GameState) randVal;
+}
+
 void TransitionToGameState(GameState newGameState) {
   // some sort of loading screen?
   // shouldn't be an instant snap to different games
@@ -70,6 +98,9 @@ void TransitionToGameState(GameState newGameState) {
 }
 
 void loop() {
+  if (gameState == MAIN_MENU) {
+    MenuLoop();
+  }
   // put your main code here, to run repeatedly:
   
   // if (gameState != menu || gameState != endscreen) {
