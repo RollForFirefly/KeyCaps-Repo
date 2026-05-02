@@ -6,9 +6,9 @@ rgb_lcd lcd;
 MMA7660 accelemeter;
 
 // Pins
-const int encoderButtonPin = 2;  // Encoder button
-const int ledPin = 3;            // Separate blue LED for shake feedback
-const int buzzerPin = 4;         // Buzzer pin
+const int ButtonPin = 8;  // Encoder button
+const int ledPin = 5;            // Separate blue LED for shake feedback
+const int buzzerPin = 6;         // Buzzer pin
 
 // Global variables (minimal)
 bool counting = false;
@@ -24,7 +24,7 @@ void setup() {
 
   lcd.begin(16, 2); 
 
-  pinMode(encoderButtonPin, INPUT_PULLUP);
+  pinMode(ButtonPin, INPUT);
   pinMode(ledPin, OUTPUT);
   pinMode(buzzerPin, OUTPUT);
 
@@ -40,13 +40,13 @@ void setup() {
 
 void loop() {
   // Check if the encoder button is pressed
-  if (!counting && digitalRead(encoderButtonPin) == LOW) {
+  if (!counting && digitalRead(ButtonPin) == HIGH) {
     counting = true;
     shakeCount = 0;
     Serial.println("Button pressed! Counting shakes has started!");
     lcd.clear();
     lcd.print("Shake!");
-    delay(200); // debounce
+    delay(1000); // debounce
   }
 
   if (counting) {
