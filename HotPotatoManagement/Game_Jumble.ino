@@ -57,6 +57,7 @@ unsigned int numLeftPressesUnbroken = 0;
 // --- Forward declarations --- tbh these aren't necessary but they're also not unhelpful so 🤷
 void UpdateDisplay();
 void JumbleSetup();
+void JumbleLoop();
 void ShuffleLetters();
 void MoveSelection();
 void RestartJumble();
@@ -251,7 +252,7 @@ void PlayMelody(int melody[], int duration[], int len) {
   }
 }
 
-void jumbleLoop()
+void JumbleLoop()
 {
   if (CheckJumble() && jumbleState != WIN)
   {

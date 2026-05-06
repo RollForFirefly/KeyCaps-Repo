@@ -37,17 +37,7 @@ void setup() {
 
 }
 
-void HandleState() {
-  switch (gameState) {
-    case MAIN_MENU:
-      MenuLoop();
-      break;
-  }   
-  
-}
-
 void SetUpGame() {
-
   switch (gameState) {
     case JUMBLE_GAME:
       JumbleSetup();
@@ -71,7 +61,7 @@ void WriteInstructions() {
       break;
     case SHAKE_GAME:
       instructLineOne = "Shake me fast";
-      instructLineTwo = "..."
+      instructLineTwo = "...";
       break;
     default:
       instructLineOne = "ERR: NO INSTR";
@@ -99,8 +89,8 @@ void MenuLoop() {
   lcd.print("Press any button...");
 
   if (HasReceivedInput()) {
-    gameState = GetRandomGame();
     isLoading = true;
+    gameState = GetRandomGame();
   }
 }
 
@@ -109,18 +99,18 @@ bool HasReceivedInput() {
 }
 
 void GameLoop() {
-  // increment timer
-  // play game
-
   switch (gameState) {
     case JUMBLE_GAME:
-      jumbleLoop();
+      JumbleLoop();
+      break;
+    case SHAKE_GAME:
+      ShakeLoop();
       break;
   }
 }
 
 GameState GetRandomGame() {
-  int minVal = 2;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY
+  int minVal = 2;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY, WILL UPDATE LATER
   int maxVal = 3 + 1;
   int randVal = random(minVal, maxVal);
   return (GameState) randVal;
@@ -138,11 +128,10 @@ void loop() {
   }
   else if (isLoading) {
     WriteInstructions();
+    SetUpGame();
   }
-  // put your main code here, to run repeatedly:
-  
-  // if (gameState != menu || gameState != endscreen) {
-    // GameLoop();
-  // }
+  else {
+    GameLoop();
+  }
 
 }
