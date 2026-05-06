@@ -54,7 +54,7 @@ int rightButtonState = 0;
 // Debug-related
 unsigned int numLeftPressesUnbroken = 0;
 
-// --- Forward declarations --- tbh these aren't necessary but they're also not unhelpful so 🤷
+// --- Forward declarations
 void UpdateDisplay();
 void JumbleSetup();
 void JumbleLoop();
@@ -64,7 +64,6 @@ void RestartJumble();
 void ReadInput();
 bool CheckJumble();
 void DebugJumble(bool isDebug, String debugMsg, String debugVar = "");
-void TryUnlockDebugMode();
 void PlayTune(JumbleTunes jumbleTune);
 
 void JumbleSetup()
@@ -109,14 +108,6 @@ void DebugJumble(bool isDebug, String debugMsg, String debugVar = "") {
   if (isDebug) {
     Serial.print(debugMsg);
     Serial.println(debugVar); // regardless of value of optional parameter, we println to ensure the serial has a new line after each debug message
-  }
-}
-
-void TryUnlockDebugMode() {
-  if (numLeftPressesUnbroken == 4 && !isDebug) {
-    String debugUnlock = "<<< DEBUG MODE UNLOCKED >>>";
-    DebugJumble(true, debugUnlock);
-    isDebug = true;
   }
 }
 
@@ -206,7 +197,6 @@ void ReadInput()
     if (leftButtonState == HIGH && jumbleState == PLAY)
     {
       numLeftPressesUnbroken++;
-      TryUnlockDebugMode();
       ShuffleLetters();
       UpdateDisplay();
     }
