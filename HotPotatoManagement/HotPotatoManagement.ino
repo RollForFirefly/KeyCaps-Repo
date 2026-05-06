@@ -19,6 +19,8 @@ extern void JumbleSetup();
 extern void JumbleLoop();
 extern void ShakeSetup();
 extern void ShakeLoop();
+extern void SimonSetup();
+extern void SimonLoop();
 
 enum GameState {
   MAIN_MENU = 0,

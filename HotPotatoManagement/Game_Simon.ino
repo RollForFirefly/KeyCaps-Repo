@@ -1,8 +1,6 @@
 #include <Wire.h>
 #include "rgb_lcd.h"
 
-rgb_lcd lcd;
-
 // Pins
 const int BUZZER_PIN = 4;
 const int BTN_LEFT = 7;
@@ -43,7 +41,7 @@ const int TONE_ERROR = 200;
 const int TONE_SUCCESS = 1200;
 
 // State
-enum GameState
+enum SimonState
 {   
     SHOWING_SEQUENCE,
     WAITING_FOR_INPUT,
@@ -51,7 +49,7 @@ enum GameState
     GAME_COMPLETE
 };
 
-GameState gameState = SHOWING_SEQUENCE;
+SimonState simonState = SHOWING_SEQUENCE;
 bool inputArmed = false;
 
 // Custom LCD characters
@@ -189,7 +187,7 @@ void startNewGame()
     printSequence();
 
     clearScreen();
-    gameState = SHOWING_SEQUENCE;
+    simonState = SHOWING_SEQUENCE;
 }
 
 // Display
@@ -267,7 +265,7 @@ void showSequence()
 
     inputIndex = 0;
     inputArmed = false;
-    gameState = WAITING_FOR_INPUT;
+    simonState = WAITING_FOR_INPUT;
 
     Serial.println("Sequence shown.");
     Serial.println("Waiting for buttons to be released before accepting input.");
@@ -323,7 +321,7 @@ void showFailureFeedback(int input)
     inputArmed = false;
 
     clearScreen();
-    gameState = SHOWING_SEQUENCE;
+    simonState = SHOWING_SEQUENCE;
 }
 
 // Input
@@ -414,7 +412,7 @@ void checkInput(int input)
     if (inputIndex >= sequenceLength)
     {
         clearScreen();
-        gameState = LEVEL_SUCCESS;
+        simonState = LEVEL_SUCCESS;
     }
     else
     {
@@ -428,7 +426,7 @@ void handleLevelSuccess()
 
     if (sequenceLength >= TARGET_SEQUENCE_LENGTH)
     {
-        gameState = GAME_COMPLETE;
+        simonState = GAME_COMPLETE;
         return;
     }
 
@@ -453,7 +451,7 @@ void handleLevelSuccess()
     inputArmed = false;
 
     clearScreen();
-    gameState = SHOWING_SEQUENCE;
+    simonState = SHOWING_SEQUENCE;
 }
 
 void handleGameComplete()
@@ -475,7 +473,7 @@ void handleGameComplete()
 }
 
 // Arduino setup
-void setup()
+void SimonSetup()
 {
     Serial.begin(9600);
     delay(STARTUP_SETTLE_DELAY);
@@ -504,9 +502,9 @@ void setup()
 }
 
 // Main loop
-void loop()
+void SimonLoop()
 {
-    switch (gameState)
+    switch (simonState)
     {
     case SHOWING_SEQUENCE:
         showSequence();
