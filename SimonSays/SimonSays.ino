@@ -3,35 +3,58 @@
 
 rgb_lcd lcd;
 
-// -------------------- Pins --------------------
+// Pins
 const int BUZZER_PIN = 4;
 const int BTN_LEFT = 7;
 const int BTN_RIGHT = 8;
 
-// -------------------- Game Settings --------------------
-const int MAX_SEQUENCE = 32; // To prevent overflow, needs to be bigger than TARGET_SEQUENCE_LENGTH
+// Game settings
+const int MAX_SEQUENCE = 32;
+const int TARGET_SEQUENCE_LENGTH = 6; // TODO: Change this, probably based on game state? Or is it always the same?
+
 int sequence[MAX_SEQUENCE];
 int sequenceLength = 1;
+int inputIndex = 0;
 
-const int TARGET_SEQUENCE_LENGTH = 8;
+// Timing
+const int STARTUP_SETTLE_DELAY = 1500;
+const int LCD_SETTLE_DELAY = 500;
+const int LCD_ACTION_DELAY = 50;
 
-// -------------------- Timing --------------------
 const int BASE_SHOW_DELAY = 600;
-const int MIN_SHOW_DELAY = 200;
-const int SPEED_STEP = 30;
+const int MIN_SHOW_DELAY = 100;
+const int SPEED_STEP = 50;
 
+const int WATCH_DELAY = 700;
+const int AFTER_WATCH_DELAY = 200;
 const int BETWEEN_DELAY = 250;
 
-// -------------------- Sounds --------------------
+const int DEBOUNCE_DELAY = 40;
+const int INPUT_ARM_DELAY = 150;
+
+const int SUCCESS_DELAY = 700;
+const int FAILURE_DELAY = 1200;
+const int COMPLETE_DELAY = 1000;
+
+// Sounds
 const int TONE_LEFT = 600;
 const int TONE_RIGHT = 900;
 const int TONE_ERROR = 200;
+const int TONE_SUCCESS = 1200;
 
-// -------------------- State --------------------
-bool isShowing = true;
-int inputIndex = 0;
+// State
+enum GameState
+{
+    SHOWING_SEQUENCE,
+    WAITING_FOR_INPUT,
+    LEVEL_SUCCESS,
+    GAME_COMPLETE
+};
 
-// -------------------- Custom Characters --------------------
+GameState gameState = SHOWING_SEQUENCE;
+bool inputArmed = false;
+
+// Custom LCD characters
 byte arrowLeft[8] = {
     0b00100,
     0b01000,
@@ -52,13 +75,17 @@ byte arrowRight[8] = {
     0b00000,
     0b00000};
 
-// -------------------- Helpers --------------------
+// Helpers
 int getShowDelay()
 {
-    int d = BASE_SHOW_DELAY - (sequenceLength - 1) * SPEED_STEP;
-    if (d < MIN_SHOW_DELAY)
-        d = MIN_SHOW_DELAY;
-    return d;
+    int delayTime = BASE_SHOW_DELAY - (sequenceLength - 1) * SPEED_STEP;
+
+    if (delayTime < MIN_SHOW_DELAY)
+    {
+        delayTime = MIN_SHOW_DELAY;
+    }
+
+    return delayTime;
 }
 
 void beep(int freq, int duration)
@@ -66,62 +93,163 @@ void beep(int freq, int duration)
     tone(BUZZER_PIN, freq, duration);
 }
 
-void clearSecondRow()
+void printPadded(const char *text)
 {
-    lcd.setCursor(0, 1);
-    lcd.print("                ");
-}
+    lcd.print(text);
 
-void waitRelease()
-{
-    // TODO: Maybe add small delay to debounce?
-    while (digitalRead(BTN_LEFT) == LOW || digitalRead(BTN_RIGHT) == LOW)
+    int len = strlen(text);
+
+    for (int i = len; i < 16; i++)
     {
-        delay(10);
+        lcd.print(" ");
     }
 }
 
-// -------------------- Display --------------------
+void setRow(int row, const char *text)
+{
+    lcd.setCursor(0, row);
+    printPadded(text);
+}
+
+void clearSecondRow()
+{
+    setRow(1, "");
+}
+
+void clearScreen()
+{
+    setRow(0, "");
+    setRow(1, "");
+    delay(LCD_ACTION_DELAY);
+}
+
+bool leftPressed()
+{
+    return digitalRead(BTN_LEFT) == HIGH;
+}
+
+bool rightPressed()
+{
+    return digitalRead(BTN_RIGHT) == HIGH;
+}
+
+void waitForNoButtons(const char *reason)
+{
+    if (leftPressed() || rightPressed())
+    {
+        Serial.print("Waiting for buttons to be released: ");
+        Serial.println(reason);
+    }
+
+    while (leftPressed() || rightPressed())
+    {
+        delay(10);
+    }
+
+    delay(DEBOUNCE_DELAY);
+}
+
+void printSequence()
+{
+    Serial.print("Current sequence: ");
+
+    for (int i = 0; i < sequenceLength; i++)
+    {
+        Serial.print(sequence[i] == 0 ? "L" : "R");
+
+        if (i < sequenceLength - 1)
+        {
+            Serial.print(" ");
+        }
+    }
+
+    Serial.println();
+}
+
+void generateStep(int index)
+{
+    sequence[index] = random(0, 2);
+
+    Serial.print("Generated step ");
+    Serial.print(index);
+    Serial.print(": ");
+    Serial.println(sequence[index] == 0 ? "LEFT" : "RIGHT");
+}
+
+void startNewGame()
+{
+    Serial.println();
+    Serial.println("Starting new Simon Says game");
+
+    sequenceLength = 1;
+    inputIndex = 0;
+    inputArmed = false;
+
+    generateStep(0);
+    printSequence();
+
+    clearScreen();
+    gameState = SHOWING_SEQUENCE;
+}
+
+// Display
 void showLeft()
 {
-    int d = getShowDelay();
+    int delayTime = getShowDelay();
 
     clearSecondRow();
     lcd.setCursor(0, 1);
     lcd.write((unsigned char)0);
 
-    beep(TONE_LEFT, d);
-    delay(d);
+    beep(TONE_LEFT, delayTime);
+    delay(delayTime);
+
+    clearSecondRow();
 }
 
 void showRight()
 {
-    int d = getShowDelay();
+    int delayTime = getShowDelay();
 
     clearSecondRow();
     lcd.setCursor(15, 1);
     lcd.write((unsigned char)1);
 
-    beep(TONE_RIGHT, d);
-    delay(d);
-}
+    beep(TONE_RIGHT, delayTime);
+    delay(delayTime);
 
-// -------------------- Game Logic --------------------
-void generateNextStep()
-{
-    sequence[sequenceLength - 1] = random(0, 2); // 0 = left, 1 = right
+    clearSecondRow();
 }
 
 void showSequence()
 {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Simon Says");
+    Serial.println();
+    Serial.println("SHOW_SEQUENCE ENTERED");
+    Serial.print("Showing sequence. Length: ");
+    Serial.println(sequenceLength);
+    printSequence();
 
-    delay(400);
+    clearScreen();
+
+    setRow(0, "Simon Says");
+    setRow(1, "Watch...");
+
+    delay(WATCH_DELAY);
+
+    clearSecondRow();
+    delay(AFTER_WATCH_DELAY);
+
+    Serial.println("About to show actual sequence");
 
     for (int i = 0; i < sequenceLength; i++)
     {
+        Serial.print("Showing step ");
+        Serial.print(i + 1);
+        Serial.print("/");
+        Serial.print(sequenceLength);
+        Serial.print(": ");
+        Serial.println(sequence[i] == 0 ? "LEFT" : "RIGHT");
+
         if (sequence[i] == 0)
         {
             showLeft();
@@ -130,125 +258,278 @@ void showSequence()
         {
             showRight();
         }
+
         delay(BETWEEN_DELAY);
     }
 
     clearSecondRow();
-    lcd.setCursor(0, 1);
-    lcd.print("Repeat");
+    setRow(1, "Repeat");
 
-    isShowing = false;
     inputIndex = 0;
+    inputArmed = false;
+    gameState = WAITING_FOR_INPUT;
+
+    Serial.println("Sequence shown.");
+    Serial.println("Waiting for buttons to be released before accepting input.");
 }
 
-void resetLevel()
+void showCorrectFeedback(int input)
 {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Try Again!");
+    clearSecondRow();
 
-    beep(TONE_ERROR, 400);
-    delay(1000);
-
-    // Important: keep same sequence
-    inputIndex = 0;
-    isShowing = true;
-}
-
-void successStep()
-{
-    inputIndex++;
-
-    if (inputIndex >= sequenceLength)
+    if (input == 0)
     {
+        lcd.setCursor(0, 1);
+        lcd.write((unsigned char)0);
+        beep(TONE_LEFT, 150);
+    }
+    else
+    {
+        lcd.setCursor(15, 1);
+        lcd.write((unsigned char)1);
+        beep(TONE_RIGHT, 150);
+    }
 
-        // ---- Completion condition ----
-        if (sequenceLength >= TARGET_SEQUENCE_LENGTH)
+    delay(150);
+
+    char progressText[17];
+    snprintf(progressText, sizeof(progressText), "%d/%d correct", inputIndex, sequenceLength);
+
+    setRow(1, progressText);
+}
+
+void showFailureFeedback(int input)
+{
+    Serial.println();
+    Serial.println("FAILURE HANDLER ENTERED");
+    Serial.println("Wrong input.");
+
+    Serial.print("Expected: ");
+    Serial.println(sequence[inputIndex] == 0 ? "LEFT" : "RIGHT");
+
+    Serial.print("Received: ");
+    Serial.println(input == 0 ? "LEFT" : "RIGHT");
+
+    Serial.println("Retrying same sequence.");
+
+    clearScreen();
+    setRow(0, "Wrong!");
+    setRow(1, "Try again");
+
+    beep(TONE_ERROR, 500);
+    delay(FAILURE_DELAY);
+
+    inputIndex = 0;
+    inputArmed = false;
+
+    clearScreen();
+    gameState = SHOWING_SEQUENCE;
+}
+
+// Input
+int readButtonPress()
+{
+    bool left = leftPressed();
+    bool right = rightPressed();
+
+    if (!inputArmed)
+    {
+        if (!left && !right)
         {
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Complete!");
+            delay(INPUT_ARM_DELAY);
 
-            beep(1200, 300);
-            delay(1500);
-
-            // Placeholder for state machine exit
-            while (true)
+            if (!leftPressed() && !rightPressed())
             {
-                // Replace with external state transition
+                inputArmed = true;
+                Serial.println("Input armed. Waiting for fresh button press.");
             }
         }
 
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Good!");
-
-        delay(600);
-
-        sequenceLength++;
-        if (sequenceLength > MAX_SEQUENCE)
-        {
-            sequenceLength = MAX_SEQUENCE;
-        }
-
-        generateNextStep();
-        isShowing = true;
+        return -1;
     }
+
+    left = leftPressed();
+    right = rightPressed();
+
+    if (left && right)
+    {
+        Serial.println("Both buttons detected. Ignoring input.");
+        waitForNoButtons("both buttons pressed");
+        inputArmed = false;
+        return -1;
+    }
+
+    if (left)
+    {
+        delay(DEBOUNCE_DELAY);
+
+        if (leftPressed() && !rightPressed())
+        {
+            Serial.println("Fresh LEFT press detected.");
+            waitForNoButtons("left button handled");
+            inputArmed = false;
+            return 0;
+        }
+    }
+
+    if (right)
+    {
+        delay(DEBOUNCE_DELAY);
+
+        if (rightPressed() && !leftPressed())
+        {
+            Serial.println("Fresh RIGHT press detected.");
+            waitForNoButtons("right button handled");
+            inputArmed = false;
+            return 1;
+        }
+    }
+
+    return -1;
 }
 
+// Game logic
 void checkInput(int input)
 {
+    Serial.print("Button pressed: ");
+    Serial.println(input == 0 ? "LEFT" : "RIGHT");
+
     if (input != sequence[inputIndex])
     {
-        resetLevel();
+        showFailureFeedback(input);
         return;
     }
 
-    // Correct input feedback
-    if (input == 0)
-        beep(TONE_LEFT, 150);
-    else
-        beep(TONE_RIGHT, 150);
+    Serial.print("Correct input ");
+    Serial.print(inputIndex + 1);
+    Serial.print("/");
+    Serial.print(sequenceLength);
+    Serial.print(": ");
+    Serial.println(input == 0 ? "LEFT" : "RIGHT");
 
-    successStep();
+    inputIndex++;
+
+    showCorrectFeedback(input);
+
+    if (inputIndex >= sequenceLength)
+    {
+        clearScreen();
+        gameState = LEVEL_SUCCESS;
+    }
+    else
+    {
+        inputArmed = false;
+    }
 }
 
-// -------------------- Arduino Setup --------------------
+void handleLevelSuccess()
+{
+    Serial.println("Level completed.");
+
+    if (sequenceLength >= TARGET_SEQUENCE_LENGTH)
+    {
+        gameState = GAME_COMPLETE;
+        return;
+    }
+
+    clearScreen();
+    setRow(0, "Good!");
+    setRow(1, "Next round");
+
+    beep(TONE_SUCCESS, 200);
+    delay(SUCCESS_DELAY);
+
+    sequenceLength++;
+
+    if (sequenceLength > MAX_SEQUENCE)
+    {
+        sequenceLength = MAX_SEQUENCE;
+    }
+
+    generateStep(sequenceLength - 1);
+    printSequence();
+
+    inputIndex = 0;
+    inputArmed = false;
+
+    clearScreen();
+    gameState = SHOWING_SEQUENCE;
+}
+
+void handleGameComplete()
+{
+    Serial.println();
+    Serial.println("Simon Says complete.");
+    Serial.println("Restarting game so parent handler can stop it externally when needed.");
+
+    clearScreen();
+    setRow(0, "Complete!");
+    setRow(1, "Restarting");
+
+    beep(1400, 200);
+    delay(250);
+    beep(1600, 200);
+    delay(COMPLETE_DELAY);
+
+    startNewGame();
+}
+
+// Arduino setup
 void setup()
 {
-    pinMode(BTN_LEFT, INPUT_PULLUP);
-    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    Serial.begin(9600);
+    delay(STARTUP_SETTLE_DELAY);
+
+    Serial.println();
+    Serial.println("=== SETUP ENTERED ===");
+
+    pinMode(BTN_LEFT, INPUT);
+    pinMode(BTN_RIGHT, INPUT);
+
     pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
 
     lcd.begin(16, 2);
+    delay(LCD_SETTLE_DELAY);
 
     lcd.createChar(0, arrowLeft);
     lcd.createChar(1, arrowRight);
+    delay(200);
 
     randomSeed(analogRead(A0));
 
-    generateNextStep();
+    waitForNoButtons("startup");
+
+    startNewGame();
 }
 
-// -------------------- Main Loop --------------------
+// Main loop
 void loop()
 {
-    if (isShowing)
+    switch (gameState)
     {
+    case SHOWING_SEQUENCE:
         showSequence();
-        return;
+        break;
+
+    case WAITING_FOR_INPUT:
+    {
+        int input = readButtonPress();
+
+        if (input != -1)
+        {
+            checkInput(input);
+        }
+
+        break;
     }
 
-    // Read buttons
-    if (digitalRead(BTN_LEFT) == LOW)
-    {
-        waitRelease();
-        checkInput(0);
-    }
+    case LEVEL_SUCCESS:
+        handleLevelSuccess();
+        break;
 
-    if (digitalRead(BTN_RIGHT) == LOW)
-    {
-        waitRelease();
-        checkInput(1);
+    case GAME_COMPLETE:
+        handleGameComplete();
+        break;
     }
 }
