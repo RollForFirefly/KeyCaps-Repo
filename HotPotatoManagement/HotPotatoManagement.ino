@@ -17,12 +17,16 @@
 
 extern void JumbleSetup();
 extern void JumbleLoop();
+extern void ShakeSetup();
+extern void ShakeLoop();
 
 enum GameState {
   MAIN_MENU = 0,
   LOADING_SCREEN = 1,
   JUMBLE_GAME = 2,
-  END_SCREEN = 3,
+  SHAKE_GAME = 3,
+  SIMON_GAME = 4,
+  END_SCREEN = 5,
 };
 
 GameState gameState = MAIN_MENU;
@@ -31,28 +35,58 @@ void setup() {
   
   lcd.begin(16, 2);
 
-  // TODO: TEST CROSS-INO ACCESS
-
 }
 
 void HandleState() {
   switch (gameState) {
     case MAIN_MENU:
       MenuLoop();
-  } 
+      break;
+  }   
+  
 }
 
 void SetUpGame() {
+
   switch (gameState) {
     case JUMBLE_GAME:
-      // CALL SETUP LOGIC FOR THE GAME
       JumbleSetup();
       break;
+    case SHAKE_GAME:
+      ShakeSetup();
     default:
       break;
   }
 
 
+}
+
+void WriteInstructions() {
+  String instructLineOne;
+  String instructLineTwo;
+  switch (gameState) {
+    case JUMBLE_GAME:
+      instructLineOne = "Unshuffle JUMBLE";
+      instructLineTwo = "LB: Swap RB: Move";
+      break;
+    case SHAKE_GAME:
+      instructLineOne = "Shake me fast";
+      instructLineTwo = "..."
+      break;
+    default:
+      instructLineOne = "ERR: NO INSTR";
+      instructLineTwo = "STATE: " + String(gameState);
+      break;
+  }
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(instructLineOne);
+  lcd.setCursor(0, 1);
+  lcd.print(instructLineTwo);
+
+  delay(3000); // pause on the instructions for 3 seconds. TODO: swap to millis instead of delay, ignore input, pause explode timer;
+  isLoading = false;
 }
 
 void MenuLoop() {
@@ -66,6 +100,7 @@ void MenuLoop() {
 
   if (HasReceivedInput()) {
     gameState = GetRandomGame();
+    isLoading = true;
   }
 }
 
@@ -85,8 +120,8 @@ void GameLoop() {
 }
 
 GameState GetRandomGame() {
-  int minVal = JUMBLE_GAME;
-  int maxVal = JUMBLE_GAME + 1;
+  int minVal = 2;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY
+  int maxVal = 3 + 1;
   int randVal = random(minVal, maxVal);
   return (GameState) randVal;
 }
@@ -100,6 +135,9 @@ void TransitionToGameState(GameState newGameState) {
 void loop() {
   if (gameState == MAIN_MENU) {
     MenuLoop();
+  }
+  else if (isLoading) {
+    WriteInstructions();
   }
   // put your main code here, to run repeatedly:
   

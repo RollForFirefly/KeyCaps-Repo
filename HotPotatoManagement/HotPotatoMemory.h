@@ -7,3 +7,4 @@
 
 int testNum = 0;
 rgb_lcd lcd;
+bool isLoading = false;
