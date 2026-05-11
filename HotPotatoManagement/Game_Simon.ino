@@ -40,6 +40,8 @@ const int TONE_RIGHT = 900;
 const int TONE_ERROR = 200;
 const int TONE_SUCCESS = 1200;
 
+void extern GoNextGame();
+
 // State
 enum SimonState
 {   
@@ -469,7 +471,7 @@ void handleGameComplete()
     beep(1600, 200);
     delay(COMPLETE_DELAY);
 
-    startNewGame();
+    GoNextGame();
 }
 
 // Arduino setup

@@ -4,7 +4,6 @@
 MMA7660 accelemeter;
 
 // Pins
-const int encoderButtonPin = 2;  // Encoder button
 const int ledPin = 3;            // Separate blue LED for shake feedback
 const int buzzerPin = 4;         // Buzzer pin
 
@@ -16,13 +15,16 @@ int lastDirX = 0, lastDirY = 0, lastDirZ = 0;
 unsigned long lastShake = 0;
 const int debounceTime = 200; // ms
 
+void extern GoNextGame();
+
 void ShakeSetup() {
   Serial.begin(9600);
   accelemeter.init();
 
   lcd.begin(16, 2); 
 
-  pinMode(encoderButtonPin, INPUT_PULLUP);
+  pinMode(LEFT_B_PIN, INPUT);
+  pinMode(RIGHT_B_PIN, INPUT);
   pinMode(ledPin, OUTPUT);
   pinMode(buzzerPin, OUTPUT);
 
@@ -38,7 +40,7 @@ void ShakeSetup() {
 
 void ShakeLoop() {
   // Check if the encoder button is pressed
-  if (!counting && digitalRead(encoderButtonPin) == LOW) {
+  if (!counting && (digitalRead(LEFT_B_PIN) == HIGH || digitalRead(RIGHT_B_PIN) == HIGH)) {
     counting = true;
     shakeCount = 0;
     Serial.println("Button pressed! Counting shakes has started!");
@@ -78,11 +80,7 @@ void ShakeLoop() {
 
       delay(2000);
 
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Press button");
-      lcd.setCursor(0, 1);
-      lcd.print("to restart");
+      GoNextGame();
       
     }
 

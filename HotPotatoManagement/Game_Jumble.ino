@@ -28,8 +28,8 @@ int victoryDuration[] = {
   8, 8, 8, 8, 8
 };
 
-int dur = 1000;   // 1000ms, to be divided by the duration of notes when played
-int tuneDuration = 4;
+int const dur = 1000;   // 1000ms, to be divided by the duration of notes when played
+int const tuneDuration = 4;
 
 bool isDebug = true;
 
@@ -38,9 +38,10 @@ String possibleJumbles[] = {
   "JLMUBE",
   "JBLUME"
 };
-String jumbledEasy = "JMULBE";
-String jumbledMedium = "JLMUBE";
-String jumbledHard = "JBLUME";
+
+String const jumbledEasy = "JMULBE";
+String const jumbledMedium = "JLMUBE";
+String const jumbledHard = "JBLUME";
 
 String currentJumble = "";
 JumbleGameState jumbleState = SETUP;
@@ -65,6 +66,8 @@ void ReadInput();
 bool CheckJumble();
 void DebugJumble(bool isDebug, String debugMsg, String debugVar = "");
 void PlayTune(JumbleTunes jumbleTune);
+
+void extern GoNextGame();
 
 void JumbleSetup()
 {
@@ -148,6 +151,9 @@ void UpdateDisplay()
   {
     lcd.setCursor(0, 0);
     lcd.print("YOU WIN!");
+
+    delay(2000);
+    GoNextGame();
   }
   else if (jumbleState == LOSE)
   {

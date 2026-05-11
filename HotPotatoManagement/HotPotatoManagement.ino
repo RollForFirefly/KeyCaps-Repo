@@ -21,6 +21,16 @@ extern void ShakeSetup();
 extern void ShakeLoop();
 extern void SimonSetup();
 extern void SimonLoop();
+extern void SpeedSetup();
+extern void SpeedLoop();
+extern void ReactionSetup();
+extern void ReactionLoop();
+
+// TODO: incorporate new games
+// TODO: global timer
+// TODO: write global timer to led bar
+// TODO: boom screen when timer goes off
+// TODO: boom screen has two options: continue or exit
 
 enum GameState {
   MAIN_MENU = 0,
@@ -34,9 +44,10 @@ enum GameState {
 GameState gameState = MAIN_MENU;
 
 void setup() {
-  
   lcd.begin(16, 2);
+  bar.begin();
 
+  MenuSetup();
 }
 
 void SetUpGame() {
@@ -46,11 +57,12 @@ void SetUpGame() {
       break;
     case SHAKE_GAME:
       ShakeSetup();
+    case SIMON_GAME:
+      //SimonSetup();
+      break;
     default:
       break;
   }
-
-
 }
 
 void WriteInstructions() {
@@ -59,7 +71,7 @@ void WriteInstructions() {
   switch (gameState) {
     case JUMBLE_GAME:
       instructLineOne = "Unshuffle JUMBLE";
-      instructLineTwo = "LB: Swap RB: Move";
+      instructLineTwo = "LB:Swap  RB:Move";
       break;
     case SHAKE_GAME:
       instructLineOne = "Shake me fast";
@@ -81,18 +93,17 @@ void WriteInstructions() {
   isLoading = false;
 }
 
-void MenuLoop() {
-  // await user input to start
-  // draw menu to screen
+void MenuSetup() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("HOT POTATO V0.1");
   lcd.setCursor(0, 1);
   lcd.print("Press any button...");
+}
 
+void MenuLoop() {
   if (HasReceivedInput()) {
-    isLoading = true;
-    gameState = GetRandomGame();
+    GoNextGame();
   }
 }
 
@@ -101,6 +112,9 @@ bool HasReceivedInput() {
 }
 
 void GameLoop() {
+
+  CalculateTimer();
+
   switch (gameState) {
     case JUMBLE_GAME:
       JumbleLoop();
@@ -108,20 +122,56 @@ void GameLoop() {
     case SHAKE_GAME:
       ShakeLoop();
       break;
+    case SIMON_GAME:
+      //SimonLoop();
+      break;
+    default:
+      NoGameFound();
+      break;
   }
 }
 
 GameState GetRandomGame() {
-  int minVal = 2;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY, WILL UPDATE LATER
-  int maxVal = 3 + 1;
-  int randVal = random(minVal, maxVal);
+  int minVal = JUMBLE_GAME;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY, WILL UPDATE LATER
+  int maxVal = END_SCREEN - 1;
+  int randVal = gameState;
+  while (randVal == gameState) {
+    randVal = random(minVal, maxVal);
+  }
+
+  Serial.print("Game state:");
+  Serial.println(randVal);
   return (GameState) randVal;
 }
 
-void TransitionToGameState(GameState newGameState) {
-  // some sort of loading screen?
-  // shouldn't be an instant snap to different games
-  // perhaps screen reads "hand hot potato to the next person" or something similar
+void GoNextGame() {
+  isLoading = true;
+  gameState = GetRandomGame();
+}
+
+void NoGameFound() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("NO GAME FOUND");
+  lcd.setCursor(0, 1);
+  lcd.print("RETURNING TO MENU.");
+
+  delay(3000);
+  gameState = MAIN_MENU;
+  MenuSetup();
+}
+
+void CalculateTimer() {
+  // TIMER
+  unsigned long currentMillis = millis();
+  if (timerDiff == 0) {
+    timerDiff = currentMillis;
+  }
+
+  timerMillis = currentMillis - timerDiff;
+    
+  int barLevel = (int) (playbackModifier / 0.25f);
+  bar.setLevel(barLevel);
 }
 
 void loop() {
