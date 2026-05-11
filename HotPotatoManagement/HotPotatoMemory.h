@@ -14,3 +14,4 @@ int const timerMaxTime = 60 * 1000; // 60 seconds (1000 ms = 1 sec)
 Grove_LED_Bar bar(9, BAR_PIN, 0);
 rgb_lcd lcd;
 bool isLoading = false;
+bool hasExploded = false;

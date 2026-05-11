@@ -94,6 +94,7 @@ void WriteInstructions() {
 }
 
 void MenuSetup() {
+  bar.setLevel(0);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("HOT POTATO V0.1");
@@ -123,7 +124,7 @@ void GameLoop() {
       ShakeLoop();
       break;
     case SIMON_GAME:
-      //SimonLoop();
+      //SimonLoop();      // simon uses a lot of memory currently and causes the uno to misbehave. will improve
       break;
     default:
       NoGameFound();
@@ -132,10 +133,11 @@ void GameLoop() {
 }
 
 GameState GetRandomGame() {
-  int minVal = JUMBLE_GAME;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY, WILL UPDATE LATER
+  int minVal = JUMBLE_GAME;
   int maxVal = END_SCREEN - 1;
   int randVal = gameState;
-  while (randVal == gameState) {
+
+  while (randVal == gameState) {  // ensures we get a different game from the last
     randVal = random(minVal, maxVal);
   }
 
@@ -164,15 +166,42 @@ void NoGameFound() {
 void CalculateTimer() {
   // TIMER
   unsigned long currentMillis = millis();
+
   if (timerDiff == 0) {
     timerDiff = currentMillis;
   }
 
   timerMillis = currentMillis - timerDiff;
-    
-  int barLevel = (int) (playbackModifier / 0.25f);
+
+  if (timerMillis >= timerMaxTime) {
+    hasExploded = true;
+  }
+
+  timerMillis = constrain(timerMillis, 0, timerMaxTime);
+
+  int barLevel = map(timerMillis, 0, 60000, 1, 10);
+
   bar.setLevel(barLevel);
 }
+
+void BoomScreen() {
+  bar.setLevel(0);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("YOU BLEW UP");
+  lcd.setCursor(0, 1);
+  lcd.print("Press any button");
+}
+
+// void ContinueSetup() {
+//   lcd.clear();
+//   lcd.setCursor(0, 0);
+//   lcd.print("Exit    Continue");
+// }
+
+// void BoomLoop() {
+//   if 
+// }
 
 void loop() {
   if (gameState == MAIN_MENU) {
@@ -181,6 +210,11 @@ void loop() {
   else if (isLoading) {
     WriteInstructions();
     SetUpGame();
+  }
+  else if (hasExploded) {
+    // BoomScreen();
+    // delay(3000);
+    // ContinueSetup();
   }
   else {
     GameLoop();
