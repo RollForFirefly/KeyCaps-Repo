@@ -1,14 +1,8 @@
 #include <Wire.h>
 #include "rgb_lcd.h"
-#include <Grove_LED_Bar.h>
 
 // LCD
 rgb_lcd lcd;
-
-// LED Bar v2.1
-const int clockPin = 6;   // DCK
-const int dataPin = 7;    // DI
-Grove_LED_Bar bar(clockPin, dataPin, 0);
 
 // Buttons
 const int leftButton = 2;
@@ -35,9 +29,6 @@ void setup() {
   lcd.begin(16, 2);
   lcd.setRGB(0, 255, 0);
 
-  bar.begin();
-  bar.setLevel(0);
-
   randomSeed(analogRead(A0));
 
   showStartScreen();
@@ -57,8 +48,6 @@ void showStartScreen() {
   lcd.print("Reaction Game");
   lcd.setCursor(0, 1);
   lcd.print("Press to start");
-
-  bar.setLevel(0);
 }
 
 void waitForStart() {
@@ -72,7 +61,6 @@ void waitForStart() {
   lcd.clear();
   lcd.setRGB(0, 100, 255);
   lcd.print("Get Ready...");
-  bar.setLevel(10);
   delay(1000);
 }
 
@@ -85,6 +73,11 @@ void playGame() {
 }
 
 void playRound(unsigned long gameStartTime) {
+  // Prevent holding button from triggering next round
+  while (digitalRead(leftButton) == LOW || digitalRead(rightButton) == LOW) {
+    delay(10);
+  }
+
   currentDirection = random(0, 2);
 
   lcd.clear();
@@ -109,11 +102,6 @@ void playRound(unsigned long gameStartTime) {
     if (millis() - gameStartTime >= gameDuration) {
       return;
     }
-
-    unsigned long elapsed = millis() - roundStartTime;
-    int remainingLevel = map(elapsed, 0, roundTimeLimit, 10, 0);
-    remainingLevel = constrain(remainingLevel, 0, 10);
-    bar.setLevel(remainingLevel);
 
     if (digitalRead(leftButton) == LOW) {
       checkAnswer(0, millis() - roundStartTime);
@@ -150,7 +138,6 @@ void checkAnswer(int input, unsigned long reactionTime) {
     lcd.print(" ms");
 
     tone(buzzer, 900, 120);
-    showCorrectLED();
   } else {
     lcd.clear();
     lcd.setRGB(255, 0, 0);
@@ -158,7 +145,6 @@ void checkAnswer(int input, unsigned long reactionTime) {
     lcd.print("Wrong!");
 
     tone(buzzer, 200, 200);
-    showErrorLED();
   }
 
   delay(400);
@@ -171,29 +157,11 @@ void showTooSlow() {
   lcd.print("Too slow!");
 
   tone(buzzer, 200, 250);
-  showErrorLED();
 
   delay(400);
 }
 
-void showCorrectLED() {
-  bar.setLevel(10);
-  delay(150);
-  bar.setLevel(0);
-}
-
-void showErrorLED() {
-  for (int i = 0; i < 3; i++) {
-    bar.setLevel(10);
-    delay(80);
-    bar.setLevel(0);
-    delay(80);
-  }
-}
-
 void showFinalResult() {
-  bar.setLevel(10);
-
   lcd.clear();
 
   if (score >= winScore) {
@@ -229,8 +197,6 @@ void waitForRestart() {
   lcd.print("Press button");
   lcd.setCursor(0, 1);
   lcd.print("to restart");
-
-  bar.setLevel(0);
 
   while (digitalRead(leftButton) == HIGH && digitalRead(rightButton) == HIGH) {
     // waiting
