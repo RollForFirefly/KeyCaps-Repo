@@ -43,6 +43,7 @@ enum GameState {
 unsigned long instructionMillis = 0;
 bool isInstructionScreenActive = false;
 bool isBoomActive = false;
+int lastBarLevel = -1;
 
 GameState gameState = MAIN_MENU;
 
@@ -231,11 +232,14 @@ void CalculateTimer() {
     hasExploded = true;
   }
 
-  int barLevel = map(timerRemaining, 0, timerMaxTime, 0, 10);
+  int barLevel = map(timerRemaining, timerMaxTime, 0, 10, 0);
 
   barLevel = constrain(barLevel, 0, 10);
 
-  bar.setLevel(barLevel);
+  if (barLevel != lastBarLevel) {
+    bar.setLevel(barLevel);
+    lastBarLevel = barLevel;
+  }
 }
 
 void BoomScreen() {
