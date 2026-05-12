@@ -5,7 +5,7 @@
 // LCD
 rgb_lcd lcd;
 
-// LED Bar
+// LED Bar v2.1
 const int clockPin = 6;   // DCK
 const int dataPin = 7;    // DI
 Grove_LED_Bar bar(clockPin, dataPin, 0);
@@ -18,11 +18,12 @@ const int rightButton = 3;
 const int buzzer = 10;
 
 // Game settings
-const int requiredSuccess = 3;
-const unsigned long timeLimit = 800;
+const unsigned long gameDuration = 45000;   // 45 seconds
+const unsigned long roundTimeLimit = 1000;  // 1 second per round
+const int winScore = 15;
 
-int successCount = 0;
-int currentDirection = 0; // 0 = left, 1 = right
+int score = 0;
+int currentDirection = 0; // 0 = LEFT, 1 = RIGHT
 
 void setup() {
   pinMode(leftButton, INPUT_PULLUP);
@@ -39,193 +40,201 @@ void setup() {
 
   randomSeed(analogRead(A0));
 
+  showStartScreen();
+}
+
+void loop() {
+  waitForStart();
+  playGame();
+  showFinalResult();
+  waitForRestart();
+}
+
+void showStartScreen() {
   lcd.clear();
+  lcd.setRGB(0, 255, 0);
   lcd.setCursor(0, 0);
   lcd.print("Reaction Game");
   lcd.setCursor(0, 1);
   lcd.print("Press to start");
 
-  Serial.println("Reaction Game Start");
-}
-
-void loop() {
-  waitForStart();
-
-  while (successCount < requiredSuccess) {
-    nextRound();
-    delay(1000);
-  }
-
-  winGame();
+  bar.setLevel(0);
 }
 
 void waitForStart() {
   while (digitalRead(leftButton) == HIGH && digitalRead(rightButton) == HIGH) {
-    // wait
+    // waiting
   }
 
-  successCount = 0;
-  bar.setLevel(0);
+  delay(300);
+  score = 0;
 
   lcd.clear();
+  lcd.setRGB(0, 100, 255);
   lcd.print("Get Ready...");
+  bar.setLevel(10);
   delay(1000);
 }
 
-void nextRound() {
-  lcd.clear();
-  bar.setLevel(0);
-  delay(200);
+void playGame() {
+  unsigned long gameStartTime = millis();
 
+  while (millis() - gameStartTime < gameDuration) {
+    playRound(gameStartTime);
+  }
+}
+
+void playRound(unsigned long gameStartTime) {
   currentDirection = random(0, 2);
+
+  lcd.clear();
+  lcd.setRGB(255, 255, 255);
 
   if (currentDirection == 0) {
     lcd.setCursor(0, 0);
     lcd.print("Press LEFT");
-    showLeft();
-    Serial.println("LEFT");
   } else {
     lcd.setCursor(0, 0);
     lcd.print("Press RIGHT");
-    showRight();
-    Serial.println("RIGHT");
   }
 
   lcd.setCursor(0, 1);
-  lcd.print("Limit: 800 ms");
+  lcd.print("Score:");
+  lcd.print(score);
 
-  unsigned long startTime = millis();
+  unsigned long roundStartTime = millis();
   bool answered = false;
 
-  while (millis() - startTime <= timeLimit) {
+  while (millis() - roundStartTime < roundTimeLimit) {
+    if (millis() - gameStartTime >= gameDuration) {
+      return;
+    }
+
+    unsigned long elapsed = millis() - roundStartTime;
+    int remainingLevel = map(elapsed, 0, roundTimeLimit, 10, 0);
+    remainingLevel = constrain(remainingLevel, 0, 10);
+    bar.setLevel(remainingLevel);
+
     if (digitalRead(leftButton) == LOW) {
-      checkAnswer(0, millis() - startTime);
+      checkAnswer(0, millis() - roundStartTime);
       answered = true;
       break;
     }
 
     if (digitalRead(rightButton) == LOW) {
-      checkAnswer(1, millis() - startTime);
+      checkAnswer(1, millis() - roundStartTime);
       answered = true;
       break;
     }
+
+    delay(20);
   }
 
   if (!answered) {
-    lcd.clear();
-    lcd.setRGB(255, 0, 0);
-    lcd.print("Too slow!");
-
-    Serial.println("Too slow");
-
-    tone(buzzer, 200, 300);
-    showError();
-    delay(800);
+    showTooSlow();
   }
 
-  showScore();
+  delay(300);
 }
 
 void checkAnswer(int input, unsigned long reactionTime) {
-  lcd.clear();
+  if (input == currentDirection) {
+    score++;
 
-  if (input != currentDirection) {
-    lcd.setRGB(255, 0, 0);
-    lcd.print("Wrong button!");
-
-    Serial.println("Wrong button");
-
-    tone(buzzer, 200, 300);
-    showError();
-  } else {
-    successCount++;
-
+    lcd.clear();
     lcd.setRGB(0, 255, 0);
-    lcd.print("Good!");
+    lcd.setCursor(0, 0);
+    lcd.print("Correct!");
     lcd.setCursor(0, 1);
     lcd.print(reactionTime);
     lcd.print(" ms");
 
-    Serial.print("Correct: ");
-    Serial.print(reactionTime);
-    Serial.println(" ms");
+    tone(buzzer, 900, 120);
+    showCorrectLED();
+  } else {
+    lcd.clear();
+    lcd.setRGB(255, 0, 0);
+    lcd.setCursor(0, 0);
+    lcd.print("Wrong!");
 
-    tone(buzzer, 900, 150);
-    showCorrect();
+    tone(buzzer, 200, 200);
+    showErrorLED();
   }
 
-  delay(800);
+  delay(400);
 }
 
-void showScore() {
+void showTooSlow() {
   lcd.clear();
-  lcd.setRGB(0, 100, 255);
-
+  lcd.setRGB(255, 0, 0);
   lcd.setCursor(0, 0);
-  lcd.print("Score:");
-  lcd.print(successCount);
-  lcd.print("/");
-  lcd.print(requiredSuccess);
+  lcd.print("Too slow!");
 
-  int level = map(successCount, 0, requiredSuccess, 0, 10);
-  bar.setLevel(level);
+  tone(buzzer, 200, 250);
+  showErrorLED();
 
-  delay(800);
+  delay(400);
 }
 
-void showLeft() {
-  // Light left side of LED bar
-  bar.setBits(0b0000000000011111);
-}
-
-void showRight() {
-  // Light right side of LED bar
-  bar.setBits(0b1111100000000000);
-}
-
-void showCorrect() {
+void showCorrectLED() {
   bar.setLevel(10);
-  delay(200);
+  delay(150);
   bar.setLevel(0);
 }
 
-void showError() {
+void showErrorLED() {
   for (int i = 0; i < 3; i++) {
     bar.setLevel(10);
-    delay(100);
+    delay(80);
     bar.setLevel(0);
-    delay(100);
+    delay(80);
   }
 }
 
-void winGame() {
+void showFinalResult() {
+  bar.setLevel(10);
+
   lcd.clear();
-  lcd.setRGB(255, 255, 0);
-  lcd.setCursor(0, 0);
-  lcd.print("You Win!");
-  lcd.setCursor(0, 1);
-  lcd.print("Game Over");
 
-  Serial.println("You Win!");
+  if (score >= winScore) {
+    lcd.setRGB(255, 255, 0);
+    lcd.setCursor(0, 0);
+    lcd.print("You Win!");
+    lcd.setCursor(0, 1);
+    lcd.print("Score:");
+    lcd.print(score);
 
-  for (int i = 0; i < 5; i++) {
-    bar.setLevel(10);
-    tone(buzzer, 1000, 100);
-    delay(150);
+    for (int i = 0; i < 3; i++) {
+      tone(buzzer, 1000, 150);
+      delay(200);
+    }
+  } else {
+    lcd.setRGB(255, 0, 0);
+    lcd.setCursor(0, 0);
+    lcd.print("Try Again");
+    lcd.setCursor(0, 1);
+    lcd.print("Score:");
+    lcd.print(score);
 
-    bar.setLevel(0);
-    delay(150);
+    tone(buzzer, 180, 500);
   }
 
-  delay(2000);
+  delay(3000);
+}
 
+void waitForRestart() {
   lcd.clear();
   lcd.setRGB(0, 255, 0);
-  lcd.print("Press to restart");
+  lcd.setCursor(0, 0);
+  lcd.print("Press button");
+  lcd.setCursor(0, 1);
+  lcd.print("to restart");
+
+  bar.setLevel(0);
 
   while (digitalRead(leftButton) == HIGH && digitalRead(rightButton) == HIGH) {
-    // wait restart
+    // waiting
   }
 
-  delay(500);
+  delay(300);
 }
