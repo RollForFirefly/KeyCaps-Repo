@@ -1,11 +1,3 @@
-#include "Wire.h"
-#include "MMA7660.h"
-
-MMA7660 accelemeter;
-
-// Pins
-const int ledPin = 3;            // Separate blue LED for shake feedback
-const int buzzerPin = 4;         // Buzzer pin
 
 // Global variables (minimal)
 bool counting = false;
@@ -14,6 +6,10 @@ const float threshold = 0.8;
 int lastDirX = 0, lastDirY = 0, lastDirZ = 0;
 unsigned long lastShake = 0;
 const int debounceTime = 200; // ms
+
+bool shakeComplete = false;
+unsigned long shakeWinMillis = 0;
+unsigned long millisSinceDelay = 0;
 
 void extern GoNextGame();
 
@@ -25,28 +21,34 @@ void ShakeSetup() {
 
   pinMode(LEFT_B_PIN, INPUT);
   pinMode(RIGHT_B_PIN, INPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(buzzerPin, OUTPUT);
+  pinMode(BUZZ_PIN, OUTPUT);
 
-  digitalWrite(ledPin, LOW);
-  digitalWrite(buzzerPin, LOW);
+  digitalWrite(BUZZ_PIN, LOW);
 
   // Welcome message
   lcd.setCursor(0, 0);
-  lcd.print("Press button");
+  lcd.print(F("Press button"));
   lcd.setCursor(0, 1);
-  lcd.print("to start game");
+  lcd.print(F("to start game"));
 }
 
 void ShakeLoop() {
+  if (shakeComplete) {
+    // stay  on the victory screen for 2 seconds
+    if (millis() - shakeWinMillis >= 2000) {
+      shakeComplete = false;
+      GoNextGame();
+    }
+    return;
+  }
+
   // Check if the encoder button is pressed
   if (!counting && (digitalRead(LEFT_B_PIN) == HIGH || digitalRead(RIGHT_B_PIN) == HIGH)) {
     counting = true;
     shakeCount = 0;
-    Serial.println("Button pressed! Counting shakes has started!");
+    Serial.println(F("Button pressed! Counting shakes has started!"));
     lcd.clear();
-    lcd.print("Shake!");
-    delay(200); // debounce
+    lcd.print(F("Shake!"));
   }
 
   if (counting) {
@@ -61,30 +63,33 @@ void ShakeLoop() {
     detectShake(ax, lastDirX);
     detectShake(ay, lastDirY);
     detectShake(az, lastDirZ);
-    lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(shakeCount);
+    lcd.print(F("          "));
     lcd.setCursor(0, 1);
-    lcd.print( "out of 50");
+    lcd.print(F("out of 50"));
+    lcd.print(F("          "));
     // When 50 shakes reached
     if (shakeCount >= 50) {
-      digitalWrite(ledPin, HIGH);   // LED ON
-      tone(buzzerPin, 1000, 500);   // buzzer 1000Hz, 500ms
-      lcd.clear();
+      tone(BUZZ_PIN, 1000, 500);   // buzzer 1000Hz, 500ms
       lcd.setCursor(0, 0);
-      lcd.print("50 Shakes!");
+      lcd.print(F("50 Shakes!"));
+      lcd.print(F("          "));
       lcd.setCursor(0, 1);
-      lcd.print("Well done!");
+      lcd.print(F("Well done!"));
+      lcd.print(F("          "));
 
       counting = false;
 
-      delay(2000);
-
-      GoNextGame();
-      
+      shakeComplete = true;
+      shakeWinMillis = millis();
     }
 
-    delay(10); // small pause
+    if (millis() - millisSinceDelay < 10) {
+      return;
+    }
+
+    millisSinceDelay = millis();
   }
 }
 
@@ -99,13 +104,8 @@ void detectShake(float a, int &lastDir) {
       lastShake = millis();
 
       // Display shake count in Serial Monitor
-      Serial.print("Shake detected! Total = ");
+      Serial.print(F("Shake detected! Total = "));
       Serial.println(shakeCount);
-
-      // Blink LED briefly for each shake
-      digitalWrite(ledPin, HIGH);
-      delay(50);
-      digitalWrite(ledPin, LOW);
     }
     lastDir = currentDir;
   }

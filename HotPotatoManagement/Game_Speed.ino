@@ -1,11 +1,3 @@
-#include <Wire.h>
-#include "MMA7660.h"
-#include "rgb_lcd.h"
-
-MMA7660 accel;
-
-// Button
-const int buttonPin = 2;
 bool lastButtonState = HIGH;
 
 // TODO: Test and tune
@@ -29,25 +21,28 @@ float baseline = 0;
 unsigned long roundStart;
 unsigned long roundDuration = 10000; // 10 seconds
 
+bool isSpeedWaiting = false;
+unsigned long speedWaitMillis = 0;
+
 // --- Setup ---
 void SpeedSetup()
 {
     Serial.begin(9600);
     Wire.begin();
 
-    pinMode(buttonPin, INPUT_PULLUP);
+    pinMode(RIGHT_B_PIN, INPUT_PULLUP);
 
     lcd.begin(16, 2);
     lcd.setRGB(0, 128, 255);
 
-    accel.init();
+    accelemeter.init();
     delay(1000);
 
     // --- Measure baseline for magnitude at rest ---
     float ax, ay, az;
-    accel.getAcceleration(&ax, &ay, &az);
+    accelemeter.getAcceleration(&ax, &ay, &az);
     baseline = sqrt(ax * ax + ay * ay + az * az);
-    Serial.print("Baseline magnitude: ");
+    Serial.print(F("Baseline magnitude: "));
     Serial.println(baseline);
 
     startRound();
@@ -68,7 +63,7 @@ void startRound()
 void updateMinigame()
 {
     float ax, ay, az;
-    accel.getAcceleration(&ax, &ay, &az);
+    accelemeter.getAcceleration(&ax, &ay, &az);
 
     // Combine axes into magnitude
     float magnitude = sqrt(ax * ax + ay * ay + az * az);
@@ -113,11 +108,11 @@ void updateMinigame()
 
     // --- SERIAL PLOTTER OUTPUT ---
     Serial.print(raw);
-    Serial.print(",");
+    Serial.print(',');
     Serial.print(smoothedAccel);
-    Serial.print(",");
+    Serial.print(',');
     Serial.print(accelThreshold);
-    Serial.print(",");
+    Serial.print(',');
     Serial.println(progress);
 }
 
@@ -125,19 +120,28 @@ void updateMinigame()
 void drawUI()
 {
     lcd.setCursor(0, 0);
-    lcd.print("Keep moving   ");
+    lcd.print(F("Keep moving   "));
 
     lcd.setCursor(0, 1);
-    lcd.print("Prog:");
+    lcd.print(F("Prog:"));
     lcd.print(progress * 100, 0);
-    lcd.print("%   ");
+    lcd.print(F("%   "));
 }
 
 // --- Main loop ---
 void SpeedLoop()
 {
+    if (isSpeedWaiting) {
+        if (millis() - speedWaitMillis >= 1500) {
+            isSpeedWaiting = false;
+            startRound();
+        }
+
+        return;
+    }
+
     // --- Button edge detect ---
-    bool buttonState = digitalRead(buttonPin);
+    bool buttonState = digitalRead(RIGHT_B_PIN);
 
     if (lastButtonState == HIGH && buttonState == LOW)
     {
@@ -154,18 +158,24 @@ void SpeedLoop()
     if (progress >= 0.99)
     {
         lcd.clear();
-        lcd.print("Success!");
-        delay(1500);
-        startRound();
+        lcd.print(F("Success!"));
+        isSpeedWaiting = true;
+        speedWaitMillis = millis();
     }
 
     if (millis() - roundStart > roundDuration)
     {
         lcd.clear();
-        lcd.print("Time up!");
-        delay(1500);
-        startRound();
+        lcd.print(F("Time up!"));
+        isSpeedWaiting = true;
+        speedWaitMillis = millis();
     }
 
-    delay(50);
+    static unsigned long lastMillis = 0;
+
+    if (millis() - lastMillis < 50) {
+        return;
+    }
+
+    lastMillis = millis();
 }
