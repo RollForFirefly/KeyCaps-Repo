@@ -20,8 +20,8 @@ void ReactionSetup() {
   lcd.begin(16, 2);
   lcd.setRGB(0, 255, 0);
 
-  bar.begin();
-  bar.setLevel(0);
+  //bar.begin();
+  //bar.setLevel(0);
 
   randomSeed(analogRead(A0));
 
