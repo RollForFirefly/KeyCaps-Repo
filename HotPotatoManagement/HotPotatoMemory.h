@@ -11,8 +11,8 @@
 
 #define BUZZ_PIN 6
 #define LEFT_B_PIN 7
-#define RIGHT_B_PIN 8
-#define BAR_PIN 3
+#define RIGHT_B_PIN 5
+#define BAR_PIN 8
 
 // timer values
 extern unsigned long timerRemaining;

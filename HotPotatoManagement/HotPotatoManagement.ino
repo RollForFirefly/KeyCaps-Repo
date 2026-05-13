@@ -27,6 +27,9 @@ int lastBarLevel = -1;
 
 GameState gameState = MAIN_MENU;
 
+bool menuReady = false;
+bool menuWaitingForRelease = true;
+
 void setup() {
   Serial.begin(9600);
 
@@ -40,6 +43,10 @@ void setup() {
   accelemeter.init();
 
   randomSeed(analogRead(A0));   // a way for us to ensure our randomisation is random every time. randomSeed() sets the random seed according to a value. We perform an analog read on an unconnected pin to get a somewhat random val.
+  isLoading = false;
+  isInstructionScreenActive = false;
+  hasExploded = false;
+  gameState = MAIN_MENU;
 
   MenuSetup();
 }
@@ -79,12 +86,12 @@ void WriteInstructions() {
     switch (gameState) {
       case JUMBLE_GAME:
         instructLineOne = F("Unshuffle JUMBLE");
-        instructLineTwo = F("LB:Swap RB:Move");
+        instructLineTwo = F("L:Swap  R:Move");
         break;
 
       case SHAKE_GAME:
         instructLineOne = F("Shake me fast");
-        instructLineTwo = F("...");
+        instructLineTwo = F("L/R: Start");
         break;
 
       case SIMON_GAME:
@@ -136,17 +143,26 @@ void MenuSetup() {
   lcd.setCursor(0, 0);
   lcd.print(F("HOT POTATO V0.3"));
   lcd.setCursor(0, 1);
-  lcd.print(F("Press any button..."));
+  lcd.print(F("L/R to start..."));
+
+  menuWaitingForRelease = true;
 }
 
 void MenuLoop() {
+  if (menuWaitingForRelease) {
+    if (!AnyPressed()) {
+      menuWaitingForRelease = false; 
+    }
+    return;
+  }
+
   if (HasReceivedInput()) {
     GoNextGame();
   }
 }
 
 bool HasReceivedInput() {
-  return AnyPressed();
+  return AnyJustPressed();
 }
 
 GameResult GameLoop() {
@@ -233,7 +249,11 @@ void CalculateTimer() {
   }
 
   int barLevel = map(timerRemaining, 0, timerMaxTime, 0, 10);
-  barLevel = constrain(barLevel, 0, 10);
+  barLevel = constrain(barLevel, 1, 10);
+
+  if (timerRemaining == 0) {
+    barLevel = 0;
+  }
 
   if (barLevel != lastBarLevel) {
     bar.setLevel(barLevel);

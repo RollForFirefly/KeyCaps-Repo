@@ -52,22 +52,19 @@ GameResult ReactionLoop() {
       break;
 
     case REACTION_DELAY:
-      
+  
       if (millis() - reactionMillis >= 800) {
-        delayMillis = millis();
         currentDirection = random(0, 2);
 
         lcd.clear();
-
         if (currentDirection == 0) {
           lcd.print(F("PRESS LEFT"));
-        }
-        else {
+        } else {
           lcd.print(F("PRESS RIGHT"));
         }
 
-        reactionMillis = millis();
         reactionState = REACTION_INPUT;
+        inputStartMillis = millis();
       }
 
       break;
