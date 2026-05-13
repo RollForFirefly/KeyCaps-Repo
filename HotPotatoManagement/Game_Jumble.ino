@@ -12,35 +12,28 @@ enum JumbleTunes : unsigned int {
   SHUFFLE_TUNE = NOTE_C5
 };
 
-int startMelody[] = {
+const int beginMelody[] PROGMEM = {
   NOTE_D4, NOTE_E4, NOTE_F4
 };
 
-int startDuration[] = {
+const int beginDuration[] PROGMEM = {
   8, 8, 8
 };
 
-int victoryMelody[] = {
+const int victoryMelody[] PROGMEM = {
   NOTE_D6, NOTE_F6, 0, NOTE_D6, NOTE_F6
 };
 
-int victoryDuration[] = {
+const int victoryDuration[] PROGMEM = {
   8, 8, 8, 8, 8
 };
 
-int dur = 1000;   // 1000ms, to be divided by the duration of notes when played
-int tuneDuration = 4;
+int const dur = 1000;   // 1000ms, to be divided by the duration of notes when played
+int const tuneDuration = 4;
 
-bool isDebug = true;
-
-String possibleJumbles[] = {
-  "JMULBE",
-  "JLMUBE",
-  "JBLUME"
-};
-String jumbledEasy = "JMULBE";
-String jumbledMedium = "JLMUBE";
-String jumbledHard = "JBLUME";
+String const jumbledEasy = "JMULBE";
+String const jumbledMedium = "JLMUBE";
+String const jumbledHard = "JBLUME";
 
 String currentJumble = "";
 JumbleGameState jumbleState = SETUP;
@@ -51,10 +44,17 @@ int selectionTwo = 2;
 int leftButtonState = 0;
 int rightButtonState = 0;
 
-// Debug-related
-unsigned int numLeftPressesUnbroken = 0;
+bool hasJumbleWon = false;
+unsigned long jumbleWinMillis = 0;
 
-// --- Forward declarations --- tbh these aren't necessary but they're also not unhelpful so 🤷
+const int* activeMelody = nullptr;
+const int* activeDuration = nullptr;
+int melodyLength = 0;
+int melodyIndex = 0;
+unsigned long nextNoteTime = 0;
+bool isMelodyPlaying = false;
+
+// --- Forward declarations
 void UpdateDisplay();
 void JumbleSetup();
 void JumbleLoop();
@@ -63,16 +63,15 @@ void MoveSelection();
 void RestartJumble();
 void ReadInput();
 bool CheckJumble();
-void DebugJumble(bool isDebug, String debugMsg, String debugVar = "");
-void TryUnlockDebugMode();
+void DebugJumble(String debugMsg, String debugVar = "");
 void PlayTune(JumbleTunes jumbleTune);
+
+void extern GoNextGame();
 
 void JumbleSetup()
 {
   pinMode(LEFT_B_PIN, INPUT);
   pinMode(RIGHT_B_PIN, INPUT);
-
-  lcd.begin(16, 2);
   Serial.begin(9600);
 
   // Choose a random jumble
@@ -93,31 +92,20 @@ void JumbleSetup()
     break;
   }
 
-  DebugJumble(isDebug, "Initial jumble: ", currentJumble);
+  DebugJumble(F("Initial jumble: "), currentJumble);
 
   jumbleState = PLAY;
   selectionOne = 1;
   selectionTwo = selectionOne + 1;
-  numLeftPressesUnbroken = 0;
 
   UpdateDisplay();
-  int startLen = sizeof(startMelody) / sizeof(int);
-  PlayMelody(startMelody, startDuration, startLen);
+  int startLen = sizeof(beginMelody) / sizeof(int);
+  StartMelody(beginMelody, beginDuration, startLen);
 }
 
-void DebugJumble(bool isDebug, String debugMsg, String debugVar = "") {
-  if (isDebug) {
-    Serial.print(debugMsg);
-    Serial.println(debugVar); // regardless of value of optional parameter, we println to ensure the serial has a new line after each debug message
-  }
-}
-
-void TryUnlockDebugMode() {
-  if (numLeftPressesUnbroken == 4 && !isDebug) {
-    String debugUnlock = "<<< DEBUG MODE UNLOCKED >>>";
-    DebugJumble(true, debugUnlock);
-    isDebug = true;
-  }
+void DebugJumble(String debugMsg, String debugVar = "") {
+  Serial.print(debugMsg);
+  Serial.println(debugVar); // regardless of value of optional parameter, we println to ensure the serial has a new line after each debug message
 }
 
 void ShuffleLetters()
@@ -130,38 +118,39 @@ void ShuffleLetters()
 
   PlayTune(SHUFFLE_TUNE);
 
-  DebugJumble(isDebug, "Shuffled letters: ", currentJumble);
+  DebugJumble(F("Shuffled letters: "), currentJumble);
 }
 
 void UpdateDisplay()
 {
-  lcd.clear();
-
   if (jumbleState == PLAY)
   {
     // First line: current jumble
     lcd.setCursor(0, 0);
     lcd.print(currentJumble);
+    lcd.print(F("          ")); // [note 1]: to replace any leftover characters with whitespace so we avoid the screen flicker
 
     // Second line: cursor indicators
-    String spacer = "";
+    String spacer = F("");
     for (int i = 0; i < currentJumble.length(); i++)
-      spacer += " "; // initialize with spaces
+      spacer += F(" "); // initialize with spaces
     spacer.setCharAt(selectionOne, '^');
     spacer.setCharAt(selectionTwo, '^');
 
     lcd.setCursor(0, 1);
     lcd.print(spacer);
+    lcd.print(F("          ")); // see [note 1]
   }
   else if (jumbleState == WIN)
   {
     lcd.setCursor(0, 0);
-    lcd.print("YOU WIN!");
-  }
-  else if (jumbleState == LOSE)
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("YOU LOSE!");
+    lcd.print(F("YOU WIN!"));
+    lcd.print(F("          "));
+    lcd.setCursor(0, 1);
+    lcd.print(F("          "));
+
+    hasJumbleWon = true;
+    jumbleWinMillis = millis();
   }
 }
 
@@ -184,13 +173,7 @@ void MoveSelection()
   PlayTune(MOVE_TUNE);
 
   String msg = selectionOne + ", " + selectionTwo;
-  DebugJumble(isDebug, "Selection moved to: ", msg);
-}
-
-void RestartJumble()
-{
-  delay(1000);
-  JumbleSetup();
+  DebugJumble(F("Selection moved to: "), msg);
 }
 
 void ReadInput()
@@ -201,39 +184,24 @@ void ReadInput()
   if (LB != leftButtonState)
   {
     leftButtonState = LB;
-    DebugJumble(isDebug, "Left button state: ", String(leftButtonState));
+    DebugJumble(F("Left button state: "), String(leftButtonState));
 
     if (leftButtonState == HIGH && jumbleState == PLAY)
     {
-      numLeftPressesUnbroken++;
-      TryUnlockDebugMode();
       ShuffleLetters();
       UpdateDisplay();
-    }
-
-    if ((jumbleState == WIN || jumbleState == LOSE) && leftButtonState == HIGH)
-    {
-      DebugJumble(isDebug, "Restarting game from left button...");
-      RestartJumble();
     }
   }
 
   if (RB != rightButtonState)
   {
     rightButtonState = RB;
-    DebugJumble(isDebug, "Right button state: ", String(rightButtonState));
+    DebugJumble(F("Right button state: "), String(rightButtonState));
 
     if (rightButtonState == HIGH && jumbleState == PLAY)
     {
-      numLeftPressesUnbroken = 0;
       MoveSelection();
       UpdateDisplay();
-    }
-
-    if ((jumbleState == WIN || jumbleState == LOSE) && rightButtonState == HIGH)
-    {
-      DebugJumble(isDebug, "Restarting game from right button...");
-      RestartJumble();
     }
   }
 }
@@ -242,27 +210,68 @@ void PlayTune(JumbleTunes jumbleTune) {
   tone(BUZZ_PIN, (int) jumbleTune, dur / tuneDuration);
 }
 
-void PlayMelody(int melody[], int duration[], int len) {
-  for (int i = 0; i < len; i++) {
-    tone(BUZZ_PIN, melody[i], dur / duration[i]);
+void StartMelody(int melody[], int duration[], int len) {
+  activeMelody = melody;
+  activeDuration = duration;
 
-    int pauseBetweenNotes =  dur / duration[i] * 1.30;
-    delay(pauseBetweenNotes);
-    noTone(BUZZ_PIN);
+  melodyLength = len;
+  melodyIndex = 0;
+
+  isMelodyPlaying = true;
+
+  nextNoteTime = 0;
+}
+
+void UpdateMelody() {
+  if (!isMelodyPlaying) {
+    return;
   }
+
+  if (millis() < nextNoteTime) {
+    return;
+  }
+
+  if (melodyIndex >= melodyLength) {
+    isMelodyPlaying = false;
+    noTone(BUZZ_PIN);
+
+    return;
+  }
+
+  int durationValue = pgm_read_word(&activeDuration[melodyIndex]);
+
+  int melodyValue = pgm_read_word(&activeMelody[melodyIndex]);
+
+  int noteDuration = dur / durationValue;
+
+  tone(BUZZ_PIN, melodyValue, noteDuration);
+
+  nextNoteTime = millis() + (noteDuration * 1.3);
+
+  melodyIndex++;
 }
 
 void JumbleLoop()
 {
+  if (hasJumbleWon) {
+    if (millis() - jumbleWinMillis >= 3000) {
+      hasJumbleWon = false;
+      GoNextGame();
+    }
+  }
+
+
   if (CheckJumble() && jumbleState != WIN)
   {
     jumbleState = WIN;
-    DebugJumble(isDebug, "Game has been won.");
+    DebugJumble(F("Game has been won."));
     UpdateDisplay();
 
     int vicLen = sizeof(victoryMelody) / sizeof(int);
-    PlayMelody(victoryMelody, victoryDuration, vicLen);
+    StartMelody(victoryMelody, victoryDuration, vicLen);
   }
 
   ReadInput();
+
+  UpdateMelody();
 }

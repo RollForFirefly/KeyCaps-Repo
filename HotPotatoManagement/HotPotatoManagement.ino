@@ -1,5 +1,3 @@
-#include <Wire.h>
-#include "pitches.h"
 #include "HotPotatoMemory.h"
 
 // some notes for structuring:
@@ -19,6 +17,17 @@ extern void JumbleSetup();
 extern void JumbleLoop();
 extern void ShakeSetup();
 extern void ShakeLoop();
+extern void SimonSetup();
+extern void SimonLoop();
+extern void SpeedSetup();
+extern void SpeedLoop();
+extern void ReactionSetup();
+extern void ReactionLoop();
+
+// TODO: global timer
+// TODO: write global timer to led bar
+// TODO: boom screen when timer goes off
+// TODO: boom screen has two options: continue or exit
 
 enum GameState {
   MAIN_MENU = 0,
@@ -26,15 +35,23 @@ enum GameState {
   JUMBLE_GAME = 2,
   SHAKE_GAME = 3,
   SIMON_GAME = 4,
-  END_SCREEN = 5,
+  SPEED_GAME = 5,
+  REACTION_GAME = 6,
+  END_SCREEN = 7,
 };
+
+unsigned long instructionMillis = 0;
+bool isInstructionScreenActive = false;
+bool isBoomActive = false;
+int lastBarLevel = -1;
 
 GameState gameState = MAIN_MENU;
 
 void setup() {
-  
   lcd.begin(16, 2);
+  bar.begin();
 
+  MenuSetup();
 }
 
 void SetUpGame() {
@@ -44,53 +61,91 @@ void SetUpGame() {
       break;
     case SHAKE_GAME:
       ShakeSetup();
+      break;
+    case SIMON_GAME:
+      SimonSetup();
+      break;
+    case SPEED_GAME:
+      SpeedSetup();
+      break;
+    case REACTION_GAME:
+      ReactionSetup();
+      break;
     default:
       break;
   }
-
-
 }
 
 void WriteInstructions() {
-  String instructLineOne;
-  String instructLineTwo;
-  switch (gameState) {
-    case JUMBLE_GAME:
-      instructLineOne = "Unshuffle JUMBLE";
-      instructLineTwo = "LB: Swap RB: Move";
-      break;
-    case SHAKE_GAME:
-      instructLineOne = "Shake me fast";
-      instructLineTwo = "...";
-      break;
-    default:
-      instructLineOne = "ERR: NO INSTR";
-      instructLineTwo = "STATE: " + String(gameState);
-      break;
+  if (!isInstructionScreenActive) {
+    isInstructionScreenActive = true;
+    instructionMillis = millis();
+
+    String instructLineOne;
+    String instructLineTwo;
+
+    switch (gameState) {
+      case JUMBLE_GAME:
+        instructLineOne = F("Unshuffle JUMBLE");
+        instructLineTwo = F("LB:Swap RB:Move");
+        break;
+
+      case SHAKE_GAME:
+        instructLineOne = F("Shake me fast");
+        instructLineTwo = F("...");
+        break;
+
+      case SIMON_GAME:
+        instructLineOne = F("Simon Says");
+        instructLineTwo = F("...");
+        break;
+      
+      case REACTION_GAME:
+        instructLineOne = F("React fast!");
+        instructLineTwo = F("...");
+        break;
+
+      case SPEED_GAME:
+        instructLineOne = F("Be quick!");
+        instructLineTwo = F("...");
+        break;
+
+      default:
+        instructLineOne = F("ERR: NO INSTR");
+        instructLineTwo = "STATE: " + String(gameState);
+        break;
+    }
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(instructLineOne);
+    lcd.setCursor(0, 1);
+    lcd.print(instructLineTwo);
   }
 
+  if (millis() - instructionMillis >= 3000) {
+    isInstructionScreenActive = false;
+    isLoading = false;
+    SetUpGame();
+  }
+}
+
+void MenuSetup() {
+  hasExploded = false;
+  isLoading = false;
+  gameState = MAIN_MENU;
+
+  bar.setLevel(0);
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(instructLineOne);
+  lcd.print(F("HOT POTATO V0.1"));
   lcd.setCursor(0, 1);
-  lcd.print(instructLineTwo);
-
-  delay(3000); // pause on the instructions for 3 seconds. TODO: swap to millis instead of delay, ignore input, pause explode timer;
-  isLoading = false;
+  lcd.print(F("Press any button..."));
 }
 
 void MenuLoop() {
-  // await user input to start
-  // draw menu to screen
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("HOT POTATO V0.1");
-  lcd.setCursor(0, 1);
-  lcd.print("Press any button...");
-
   if (HasReceivedInput()) {
-    isLoading = true;
-    gameState = GetRandomGame();
+    GoNextGame();
   }
 }
 
@@ -106,20 +161,126 @@ void GameLoop() {
     case SHAKE_GAME:
       ShakeLoop();
       break;
+    case SIMON_GAME:
+      SimonLoop();
+      break;
+    case SPEED_GAME:
+      SpeedLoop();
+      break;
+    case REACTION_GAME:
+      ReactionLoop();
+      break;
+    default:
+      NoGameFound();
+      break;
   }
 }
 
 GameState GetRandomGame() {
-  int minVal = 2;         // HARDCODED TO BE JUMBLE OR SHAKE CURRENTLY, WILL UPDATE LATER
-  int maxVal = 3 + 1;
-  int randVal = random(minVal, maxVal);
+  int minVal = JUMBLE_GAME;
+  int maxVal = END_SCREEN;
+  int randVal = gameState;
+
+  while (randVal == gameState || randVal == SIMON_GAME) {  // ensures we get a different game from the last
+    randVal = random(minVal, maxVal);
+  }
+
+  Serial.print(F("Game state:"));
+  Serial.println(randVal);
   return (GameState) randVal;
 }
 
-void TransitionToGameState(GameState newGameState) {
-  // some sort of loading screen?
-  // shouldn't be an instant snap to different games
-  // perhaps screen reads "hand hot potato to the next person" or something similar
+void GoNextGame() {
+  isLoading = true;
+  gameState = GetRandomGame();
+}
+
+void NoGameFound() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(F("NO GAME FOUND"));
+  lcd.setCursor(0, 1);
+  lcd.print(F("RETURNING TO MENU."));
+
+  delay(3000);
+  MenuSetup();
+}
+
+void CalculateTimer() {
+  if (!IsGameState()) {
+    return;
+  }
+
+  unsigned long currentMillis = millis();
+
+  if (lastTimerMillis == 0) {
+    lastTimerMillis = currentMillis;
+    return;
+  }
+
+  unsigned long deltaTime = currentMillis - lastTimerMillis;    // delta time AKA difference in time
+  lastTimerMillis = currentMillis;
+
+  if (deltaTime >= timerRemaining) {
+    timerRemaining = 0;
+  }
+  else {
+    timerRemaining -= deltaTime;
+  }
+
+  if (timerRemaining == 0) {
+    hasExploded = true;
+  }
+
+  int barLevel = map(timerRemaining, timerMaxTime, 0, 10, 0);
+
+  barLevel = constrain(barLevel, 0, 10);
+
+  if (barLevel != lastBarLevel) {
+    bar.setLevel(barLevel);
+    lastBarLevel = barLevel;
+  }
+}
+
+void BoomScreen() {
+  if (isBoomActive) {
+    return;
+  }
+
+  isBoomActive = true;
+
+  bar.setLevel(0);
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print(F("YOU BLEW UP"));
+
+  lcd.setCursor(0, 1);
+  lcd.print(F("Press any button"));
+}
+
+void AwaitRestartInput() {
+  if (HasReceivedInput()) {
+    timerRemaining = timerMaxTime;
+    lastTimerMillis = millis();
+
+    hasExploded = false;
+    isBoomActive = false;
+
+    lcd.clear();
+
+    if (digitalRead(LEFT_B_PIN) > 0) {
+      MenuSetup();
+    }
+    else if (digitalRead(RIGHT_B_PIN) > 0) {
+      GoNextGame();
+    }
+  }
+}
+
+bool IsGameState() {
+  return gameState == JUMBLE_GAME || gameState == SHAKE_GAME || gameState == SIMON_GAME || gameState == SPEED_GAME || gameState == REACTION_GAME;
 }
 
 void loop() {
@@ -128,10 +289,13 @@ void loop() {
   }
   else if (isLoading) {
     WriteInstructions();
-    SetUpGame();
   }
-  else {
+  else if (hasExploded) {
+    BoomScreen();
+    AwaitRestartInput();
+  }
+  else if (IsGameState()) {
+    CalculateTimer();
     GameLoop();
   }
-
 }
