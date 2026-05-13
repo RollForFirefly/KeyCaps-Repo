@@ -44,6 +44,14 @@ enum SimonState : byte
 SimonState simonState = SHOWING_SEQUENCE;
 bool inputArmed = false;
 
+unsigned long simonTimer = 0;
+unsigned long sequenceTimer = 0;
+unsigned long inputTimer = 0;
+unsigned long uiTimer = 0;
+
+bool showingStep = false;
+byte currentSequenceIndex = 0;
+
 // Custom LCD characters
 byte arrowLeft[8] = {
     0b00100,
@@ -145,47 +153,17 @@ void clearScreen()
     delay(LCD_ACTION_DELAY);
 }
 
-bool leftPressed()
-{
-    return digitalRead(LEFT_B_PIN) == HIGH;
-}
-
-bool rightPressed()
-{
-    return digitalRead(RIGHT_B_PIN) == HIGH;
-}
-
-bool WaitWithoutDelay(unsigned long duration) {
-    static unsigned long startTime = 0;         // something I learned: using 'static' like this means that this variable will persist in the memory and won't be re-declared every time we run this function. a nifty way of doing scoped variables!
-    static bool waiting = false;
-
-    if (!waiting) {
-        startTime = millis();
-        waiting = true;
+bool WaitWithoutDelay(unsigned long &timer, unsigned long duration) {
+    if (timer == 0) {
+        timer = millis();
     }
 
-    if (millis() - startTime >= duration) {
-        waiting = false;
+    if (millis() - timer >= duration) {
+        timer = 0;
         return true;
     }
 
     return false;
-}
-
-void waitForNoButtons(const __FlashStringHelper *reason)
-{
-    if (leftPressed() || rightPressed())
-    {
-        Serial.print(F("Waiting for buttons to be released: "));
-        Serial.println(reason);
-    }
-
-    while (leftPressed() || rightPressed())
-    {
-        delay(10);
-    }
-
-    delay(DEBOUNCE_DELAY);
 }
 
 void printSequence()
@@ -220,9 +198,12 @@ void startNewGame()
     Serial.println();
     Serial.println(F("Starting new Simon Says game"));
 
+    memset(sequence, 0, sizeof(sequence));
+
     sequenceLength = 1;
     inputIndex = 0;
     inputArmed = false;
+    long inputTimer = 0;
 
     generateStep(0);
     printSequence();
@@ -231,91 +212,93 @@ void startNewGame()
     simonState = SHOWING_SEQUENCE;
 }
 
-// Display
-void showLeft()
+void updateSequenceDisplay()
 {
-    uint16_t delayTime = getShowDelay();
+    if (currentSequenceIndex >= sequenceLength)
+    {
+        clearSecondRow();
+        setRow(1, F("Repeat"));
 
-    clearSecondRow();
-    lcd.setCursor(0, 1);
-    lcd.write((unsigned char)0);
+        inputIndex = 0;
+        inputArmed = false;
 
-    beep(TONE_LEFT, delayTime);
-    delay(delayTime);
+        showingStep = false;
+        simonState = WAITING_FOR_INPUT;
 
-    clearSecondRow();
-}
+        return;
+    }
 
-void showRight()
-{
-    uint16_t delayTime = getShowDelay();
+    if (!showingStep)
+    {
+        clearSecondRow();
 
-    clearSecondRow();
-    lcd.setCursor(15, 1);
-    lcd.write((unsigned char)1);
+        byte step = getStep(currentSequenceIndex);
 
-    beep(TONE_RIGHT, delayTime);
-    delay(delayTime);
+        if (step == 0)
+        {
+            lcd.setCursor(0, 1);
+            lcd.write((unsigned char)0);
+            beep(TONE_LEFT, getShowDelay());
+        }
+        else
+        {
+            lcd.setCursor(15, 1);
+            lcd.write((unsigned char)1);
+            beep(TONE_RIGHT, getShowDelay());
+        }
 
-    clearSecondRow();
+        sequenceTimer = millis();
+        showingStep = true;
+
+        return;
+    }
+
+    if (millis() - sequenceTimer >= getShowDelay())
+    {
+        clearSecondRow();
+
+        if (millis() - sequenceTimer >= getShowDelay() + BETWEEN_DELAY)
+        {
+            currentSequenceIndex++;
+            showingStep = false;
+        }
+    }
 }
 
 void showSequence()
 {
-    Serial.println();
-    Serial.println(F("SHOW_SEQUENCE ENTERED"));
-    Serial.print(F("Showing sequence. Length: "));
-    Serial.println(sequenceLength);
-    printSequence();
+    static byte phase = 0;
 
-    clearScreen();
-
-    setRow(0, F("Simon Says"));
-    setRow(1, F("Watch..."));
-
-    if (!WaitWithoutDelay(WATCH_DELAY)) {
-        return;
-    }
-
-    clearSecondRow();
-    if (!WaitWithoutDelay(AFTER_WATCH_DELAY)) {
-        return;
-    }
-
-    Serial.println(F("About to show actual sequence"));
-
-    for (byte i = 0; i < sequenceLength; i++)
+    switch (phase)
     {
-        Serial.print(F("Showing step "));
-        Serial.print(i + 1);
-        Serial.print('/');
-        Serial.print(sequenceLength);
-        Serial.print(F(": "));
-        Serial.println(getStep(i) == 0 ? F("LEFT") : F("RIGHT"));
+    case 0:
+        clearScreen();
+        setRow(0, F("Simon Says"));
+        setRow(1, F("Watch..."));
 
-        if (getStep(i) == 0)
+        phase = 1;
+        simonTimer = millis();
+        break;
+    case 1:
+        if (millis() - simonTimer >= WATCH_DELAY)
         {
-            showLeft();
+            clearSecondRow();
+
+            currentSequenceIndex = 0;
+            showingStep = false;
+
+            phase = 2;
         }
-        else
+        break;
+    case 2:
+        updateSequenceDisplay();
+
+        if (simonState == WAITING_FOR_INPUT)
         {
-            showRight();
+            phase = 0;
         }
-
-        if (!WaitWithoutDelay(BETWEEN_DELAY)) {
-        return;
+        break;
     }
-    }
-
-    clearSecondRow();
-    setRow(1, F("Repeat"));
-
-    inputIndex = 0;
-    inputArmed = false;
-    simonState = WAITING_FOR_INPUT;
-
-    Serial.println(F("Sequence shown."));
-    Serial.println(F("Waiting for buttons to be released before accepting input."));
 }
 
 void showCorrectFeedback(byte input)
@@ -335,10 +318,6 @@ void showCorrectFeedback(byte input)
         beep(TONE_RIGHT, 150);
     }
 
-    if (!WaitWithoutDelay(150)) {
-        return;
-    }
-
     char progressText[17];
     snprintf(progressText, sizeof(progressText), "%d/%d correct", inputIndex, sequenceLength);
 
@@ -347,49 +326,39 @@ void showCorrectFeedback(byte input)
 
 void showFailureFeedback(byte input)
 {
-    Serial.println();
-    Serial.println(F("FAILURE HANDLER ENTERED"));
-    Serial.println(F("Wrong input."));
-
-    Serial.print(F("Expected: "));
-    Serial.println(getStep(inputIndex) == 0 ? F("LEFT") : F("RIGHT"));
-
-    Serial.print(F("Received: "));
-    Serial.println(input == 0 ? F("LEFT") : F("RIGHT"));
-
-    Serial.println(F("Retrying same sequence."));
+    Serial.println(F("Wrong input"));
 
     clearScreen();
+
     setRow(0, F("Wrong!"));
     setRow(1, F("Try again"));
 
     beep(TONE_ERROR, 500);
-    if (!WaitWithoutDelay(FAILURE_DELAY)) {
-        return;
-    }
+
+    long inputTimer = 0;
+    simonTimer = millis();
+
+    simonState = SHOWING_SEQUENCE;
 
     inputIndex = 0;
     inputArmed = false;
-
-    clearScreen();
-    simonState = SHOWING_SEQUENCE;
 }
 
 // Input
 int readButtonPress()
 {
-    bool left = leftPressed();
-    bool right = rightPressed();
+    bool left = LeftPressed();
+    bool right = RightPressed();
 
     if (!inputArmed)
     {
         if (!left && !right)
         {
-            if (!WaitWithoutDelay(INPUT_ARM_DELAY)) {
-                return;
+            if (!WaitWithoutDelay(inputTimer, INPUT_ARM_DELAY)) {
+                return -1;
             }
 
-            if (!leftPressed() && !rightPressed())
+            if (!LeftPressed() && !RightPressed())
             {
                 inputArmed = true;
                 Serial.println(F("Input armed. Waiting for fresh button press."));
@@ -399,27 +368,25 @@ int readButtonPress()
         return -1;
     }
 
-    left = leftPressed();
-    right = rightPressed();
+    left = LeftPressed();
+    right = RightPressed();
 
     if (left && right)
     {
         Serial.println(F("Both buttons detected. Ignoring input."));
-        waitForNoButtons(F("both buttons pressed"));
         inputArmed = false;
         return -1;
     }
 
     if (left)
     {
-        if (!WaitWithoutDelay(DEBOUNCE_DELAY)) {
+        if (!WaitWithoutDelay(simonTimer, DEBOUNCE_DELAY)) {
             return -1;
         }
 
-        if (leftPressed() && !rightPressed())
+        if (LeftPressed() && !RightPressed())
         {
             Serial.println(F("Fresh LEFT press detected."));
-            waitForNoButtons(F("left button handled"));
             inputArmed = false;
             return 0;
         }
@@ -427,12 +394,9 @@ int readButtonPress()
 
     if (right)
     {
-        delay(DEBOUNCE_DELAY);
-
-        if (rightPressed() && !leftPressed())
+        if (RightPressed() && !LeftPressed())
         {
             Serial.println(F("Fresh RIGHT press detected."));
-            waitForNoButtons(F("right button handled"));
             inputArmed = false;
             return 1;
         }
@@ -477,95 +441,98 @@ void checkInput(byte input)
 
 void handleLevelSuccess()
 {
-    Serial.println(F("Level completed."));
+    static bool initialized = false;
 
-    if (sequenceLength >= TARGET_SEQUENCE_LENGTH)
+    long inputTimer = 0;
+
+    if (!initialized)
     {
-        simonState = GAME_COMPLETE;
+        initialized = true;
+
+        clearScreen();
+
+        setRow(0, F("Good!"));
+        setRow(1, F("Next round"));
+
+        beep(TONE_SUCCESS, 200);
+
+        simonTimer = millis();
+
         return;
     }
 
-    clearScreen();
-    setRow(0, F("Good!"));
-    setRow(1, F("Next round"));
-
-    beep(TONE_SUCCESS, 200);
-    
-    if (!WaitWithoutDelay(SUCCESS_DELAY)) {
+    if (millis() - simonTimer < SUCCESS_DELAY)
+    {
         return;
     }
+
+    initialized = false;
 
     sequenceLength++;
 
-    if (sequenceLength > MAX_SEQUENCE)
+    if (sequenceLength > TARGET_SEQUENCE_LENGTH)
     {
-        sequenceLength = MAX_SEQUENCE;
+        simonState = GAME_COMPLETE;
+        long inputTimer = 0;
+        return;
     }
 
     generateStep(sequenceLength - 1);
-    printSequence();
 
     inputIndex = 0;
     inputArmed = false;
 
     clearScreen();
+
     simonState = SHOWING_SEQUENCE;
 }
 
 void handleGameComplete()
 {
-    Serial.println();
-    Serial.println(F("Simon Says complete."));
-    Serial.println(F("Restarting game so parent handler can stop it externally when needed."));
+    static byte phase = 0;
 
-    clearScreen();
-    setRow(0, F("Complete!"));
-    setRow(1, F("Restarting"));
+    switch (phase)
+    {
+    case 0:
+        clearScreen();
+        setRow(0, F("Complete!"));
+        setRow(1, F("Nice work"));
+        beep(1400, 200);
 
-    beep(1400, 200);
-    if (!WaitWithoutDelay(250)) {
-        return;
+        simonTimer = millis();
+        phase = 1;
+        break;
+    case 1:
+
+        if (millis() - simonTimer >= COMPLETE_DELAY)
+        {
+            phase = 0;
+        }
+        break;
     }
-    beep(1600, 200);
-    if (!WaitWithoutDelay(COMPLETE_DELAY)) {
-        return;
-    }
-
-    startNewGame();
 }
 
 // Arduino setup
 void SimonSetup()
 {
-    Serial.begin(9600);
-    delay(STARTUP_SETTLE_DELAY);
-
     Serial.println();
     Serial.println(F("=== SETUP ENTERED ==="));
 
-    pinMode(LEFT_B_PIN, INPUT);
-    pinMode(RIGHT_B_PIN, INPUT);
-
-    pinMode(BUZZ_PIN, OUTPUT);
     digitalWrite(BUZZ_PIN, LOW);
-
-    lcd.begin(16, 2);
-    delay(LCD_SETTLE_DELAY);
-
     lcd.createChar(0, arrowLeft);
     lcd.createChar(1, arrowRight);
-    delay(200);
-
-    randomSeed(analogRead(A0));
-
-    waitForNoButtons(F("startup"));
 
     startNewGame();
 }
 
 // Main loop
-void SimonLoop()
+GameResult SimonLoop()
 {
+    if (hasExploded) {
+        return GAME_RUNNING;
+    }
+
+
     switch (simonState)
     {
     case SHOWING_SEQUENCE:
@@ -590,6 +557,8 @@ void SimonLoop()
 
     case GAME_COMPLETE:
         handleGameComplete();
-        break;
+        return GAME_WON;
     }
+
+    return GAME_RUNNING;
 }

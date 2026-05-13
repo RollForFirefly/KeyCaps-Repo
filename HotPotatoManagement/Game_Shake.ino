@@ -11,39 +11,39 @@ bool shakeComplete = false;
 unsigned long shakeWinMillis = 0;
 unsigned long millisSinceDelay = 0;
 
-void extern GoNextGame();
-
 void ShakeSetup() {
-  Serial.begin(9600);
-  accelemeter.init();
-
-  lcd.begin(16, 2); 
-
-  pinMode(LEFT_B_PIN, INPUT);
-  pinMode(RIGHT_B_PIN, INPUT);
-  pinMode(BUZZ_PIN, OUTPUT);
-
   digitalWrite(BUZZ_PIN, LOW);
 
-  // Welcome message
   lcd.setCursor(0, 0);
   lcd.print(F("Press button"));
   lcd.setCursor(0, 1);
   lcd.print(F("to start game"));
+
+  counting = false;
+  shakeCount = 0;
+  shakeComplete = false;
+  lastShake = 0;
+  lastDirX = 0;
+  lastDirY = 0;
+  lastDirZ = 0;
 }
 
-void ShakeLoop() {
+GameResult ShakeLoop() {
+  if (hasExploded) {
+    return GAME_RUNNING;
+  }
+
   if (shakeComplete) {
     // stay  on the victory screen for 2 seconds
     if (millis() - shakeWinMillis >= 2000) {
       shakeComplete = false;
-      GoNextGame();
+      return GAME_WON;
     }
-    return;
+    return GAME_RUNNING;
   }
 
   // Check if the encoder button is pressed
-  if (!counting && (digitalRead(LEFT_B_PIN) == HIGH || digitalRead(RIGHT_B_PIN) == HIGH)) {
+  if (!counting && AnyPressed()) {
     counting = true;
     shakeCount = 0;
     Serial.println(F("Button pressed! Counting shakes has started!"));
@@ -85,12 +85,10 @@ void ShakeLoop() {
       shakeWinMillis = millis();
     }
 
-    if (millis() - millisSinceDelay < 10) {
-      return;
-    }
-
     millisSinceDelay = millis();
   }
+
+  return GAME_RUNNING;
 }
 
 void detectShake(float a, int &lastDir) {

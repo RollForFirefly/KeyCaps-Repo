@@ -1,43 +1,23 @@
 #include "HotPotatoMemory.h"
 
-// some notes for structuring:
-// the games will remain as separate ino files
-// our hot potato manager will call the setup & loop functions of those games when running them. Those functions should be renamed like jumbleSetup(), shakeLoop() so that they don't get automatically called by the arduino
-// (optional) to save on memory, we will have one file for all our variables. Rather than each game defining variables, they will use the ones present in the variable file. 
-
-
-// requirements:
-// there should be a global timer/countdown that is maintained between each game. if it runs out, someone goes boom. 
-// timer restarts. time should be written to LED bar.
-// people are bounced from random game to random game. Each time a new game starts, the person should swap. 
-// winning a minigame just results in someone handing the potato off. losing restarts the minigame for that person. 
-// 
-
 extern void JumbleSetup();
-extern void JumbleLoop();
+extern GameResult JumbleLoop();
 extern void ShakeSetup();
-extern void ShakeLoop();
+extern GameResult ShakeLoop();
 extern void SimonSetup();
-extern void SimonLoop();
+extern GameResult SimonLoop();
 extern void SpeedSetup();
-extern void SpeedLoop();
+extern GameResult SpeedLoop();
 extern void ReactionSetup();
-extern void ReactionLoop();
-
-// TODO: global timer
-// TODO: write global timer to led bar
-// TODO: boom screen when timer goes off
-// TODO: boom screen has two options: continue or exit
+extern GameResult ReactionLoop();
 
 enum GameState {
-  MAIN_MENU = 0,
-  LOADING_SCREEN = 1,
-  JUMBLE_GAME = 2,
-  SHAKE_GAME = 3,
-  SIMON_GAME = 4,
-  SPEED_GAME = 5,
-  REACTION_GAME = 6,
-  END_SCREEN = 7,
+  MAIN_MENU,
+  JUMBLE_GAME,
+  SHAKE_GAME,
+  SIMON_GAME,
+  SPEED_GAME,
+  REACTION_GAME
 };
 
 unsigned long instructionMillis = 0;
@@ -48,13 +28,25 @@ int lastBarLevel = -1;
 GameState gameState = MAIN_MENU;
 
 void setup() {
+  Serial.begin(9600);
+
+  pinMode(LEFT_B_PIN, INPUT_PULLUP);
+  pinMode(RIGHT_B_PIN, INPUT_PULLUP);
+  pinMode(BUZZ_PIN, OUTPUT);
+
   lcd.begin(16, 2);
   bar.begin();
+  Wire.begin();
+  accelemeter.init();
+
+  randomSeed(analogRead(A0));   // a way for us to ensure our randomisation is random every time. randomSeed() sets the random seed according to a value. We perform an analog read on an unconnected pin to get a somewhat random val.
 
   MenuSetup();
 }
 
-void SetUpGame() {
+void SetupGame() {
+  lcd.clear();
+
   switch (gameState) {
     case JUMBLE_GAME:
       JumbleSetup();
@@ -126,7 +118,7 @@ void WriteInstructions() {
   if (millis() - instructionMillis >= 3000) {
     isInstructionScreenActive = false;
     isLoading = false;
-    SetUpGame();
+    SetupGame();
   }
 }
 
@@ -135,10 +127,14 @@ void MenuSetup() {
   isLoading = false;
   gameState = MAIN_MENU;
 
+  timerRemaining = timerMaxTime;
+  lastTimerMillis = millis();
+  lastBarLevel = -1;
+
   bar.setLevel(0);
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(F("HOT POTATO V0.1"));
+  lcd.print(F("HOT POTATO V0.3"));
   lcd.setCursor(0, 1);
   lcd.print(F("Press any button..."));
 }
@@ -150,48 +146,53 @@ void MenuLoop() {
 }
 
 bool HasReceivedInput() {
-  return digitalRead(LEFT_B_PIN) > 0 || digitalRead(RIGHT_B_PIN) > 0;
+  return AnyPressed();
 }
 
-void GameLoop() {
+GameResult GameLoop() {
   switch (gameState) {
     case JUMBLE_GAME:
-      JumbleLoop();
-      break;
+      return JumbleLoop();
+
     case SHAKE_GAME:
-      ShakeLoop();
-      break;
+      return ShakeLoop();
+
     case SIMON_GAME:
-      SimonLoop();
-      break;
+      return SimonLoop();
+
     case SPEED_GAME:
-      SpeedLoop();
-      break;
+      return SpeedLoop();
+
     case REACTION_GAME:
-      ReactionLoop();
-      break;
+      return ReactionLoop();
+
     default:
-      NoGameFound();
-      break;
+      return GAME_LOST;
   }
 }
 
 GameState GetRandomGame() {
   int minVal = JUMBLE_GAME;
-  int maxVal = END_SCREEN;
-  int randVal = gameState;
+  int maxVal = REACTION_GAME + 1; // since the random is exclusive max, we add +1 to our "max" random value.
+  GameState randGame;
 
-  while (randVal == gameState || randVal == SIMON_GAME) {  // ensures we get a different game from the last
-    randVal = random(minVal, maxVal);
-  }
+  do {
+    randGame = (GameState) random(minVal, maxVal);
+  } while (randGame == gameState);
 
-  Serial.print(F("Game state:"));
-  Serial.println(randVal);
-  return (GameState) randVal;
+  Serial.print(F("Game state: "));
+  Serial.println((int) randGame);
+  return randGame;
 }
 
 void GoNextGame() {
+  isInstructionScreenActive = false;
+  instructionMillis = 0;
+  lastTimerMillis = millis();
+
+  lastBarLevel = -1;
   isLoading = true;
+
   gameState = GetRandomGame();
 }
 
@@ -207,33 +208,31 @@ void NoGameFound() {
 }
 
 void CalculateTimer() {
-  if (!IsGameState()) {
-    return;
-  }
+  if (!IsGameState()) return;
+  if (hasExploded) return;
 
-  unsigned long currentMillis = millis();
+  unsigned long now = millis();
 
   if (lastTimerMillis == 0) {
-    lastTimerMillis = currentMillis;
+    lastTimerMillis = now;
     return;
   }
 
-  unsigned long deltaTime = currentMillis - lastTimerMillis;    // delta time AKA difference in time
-  lastTimerMillis = currentMillis;
+  unsigned long delta = now - lastTimerMillis;
+  lastTimerMillis = now;
 
-  if (deltaTime >= timerRemaining) {
+  if (delta >= timerRemaining) {
     timerRemaining = 0;
-  }
-  else {
-    timerRemaining -= deltaTime;
+  } else {
+    timerRemaining -= delta;
   }
 
   if (timerRemaining == 0) {
     hasExploded = true;
+    return;
   }
 
-  int barLevel = map(timerRemaining, timerMaxTime, 0, 10, 0);
-
+  int barLevel = map(timerRemaining, 0, timerMaxTime, 0, 10);
   barLevel = constrain(barLevel, 0, 10);
 
   if (barLevel != lastBarLevel) {
@@ -243,39 +242,42 @@ void CalculateTimer() {
 }
 
 void BoomScreen() {
-  if (isBoomActive) {
+  static bool initialized = false;
+
+  if (!hasExploded) {
+    initialized = false;
     return;
   }
 
-  isBoomActive = true;
-
-  bar.setLevel(0);
-
-  lcd.clear();
-
-  lcd.setCursor(0, 0);
-  lcd.print(F("YOU BLEW UP"));
-
-  lcd.setCursor(0, 1);
-  lcd.print(F("Press any button"));
-}
-
-void AwaitRestartInput() {
-  if (HasReceivedInput()) {
-    timerRemaining = timerMaxTime;
-    lastTimerMillis = millis();
-
-    hasExploded = false;
-    isBoomActive = false;
+  if (!initialized) {
+    initialized = true;
 
     lcd.clear();
+    bar.setLevel(0);
+    lcd.setCursor(0, 0);
+    lcd.print(F("YOU BLEW UP"));
+    lcd.setCursor(0, 1);
+    lcd.print(F("L:Menu R:Retry"));
+  }
 
-    if (digitalRead(LEFT_B_PIN) > 0) {
-      MenuSetup();
-    }
-    else if (digitalRead(RIGHT_B_PIN) > 0) {
-      GoNextGame();
-    }
+  if (LeftJustPressed()) {
+    initialized = false;
+    timerRemaining = timerMaxTime;
+    lastTimerMillis = millis();
+    lastBarLevel = -1;
+    hasExploded = false;
+
+    MenuSetup();
+  }
+
+  if (RightJustPressed()) {
+    initialized = false;
+    timerRemaining = timerMaxTime;
+    lastTimerMillis = millis();
+    lastBarLevel = -1;
+    hasExploded = false;
+
+    GoNextGame();
   }
 }
 
@@ -284,18 +286,32 @@ bool IsGameState() {
 }
 
 void loop() {
+  UpdateButtons();
+  CalculateTimer();
+
+  if (hasExploded) {
+    BoomScreen();
+    return;
+  }
+
   if (gameState == MAIN_MENU) {
     MenuLoop();
+    return;
   }
-  else if (isLoading) {
+
+  if (isLoading) {
     WriteInstructions();
+    return;
   }
-  else if (hasExploded) {
-    BoomScreen();
-    AwaitRestartInput();
-  }
-  else if (IsGameState()) {
-    CalculateTimer();
-    GameLoop();
+
+  if (IsGameState()) {
+    GameResult result = GameLoop();
+
+    if (result == GAME_WON) {
+      GoNextGame();
+    }
+    else if (result == GAME_LOST) {
+      SetupGame();
+    }
   }
 }

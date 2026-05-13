@@ -27,13 +27,7 @@ unsigned long speedWaitMillis = 0;
 // --- Setup ---
 void SpeedSetup()
 {
-    Serial.begin(9600);
     Wire.begin();
-
-    pinMode(RIGHT_B_PIN, INPUT_PULLUP);
-
-    lcd.begin(16, 2);
-    lcd.setRGB(0, 128, 255);
 
     accelemeter.init();
     delay(1000);
@@ -129,15 +123,19 @@ void drawUI()
 }
 
 // --- Main loop ---
-void SpeedLoop()
+GameResult SpeedLoop()
 {
+    if (hasExploded) {
+        return GAME_RUNNING;
+    }
+
     if (isSpeedWaiting) {
         if (millis() - speedWaitMillis >= 1500) {
             isSpeedWaiting = false;
             startRound();
         }
 
-        return;
+        return GAME_RUNNING;
     }
 
     // --- Button edge detect ---
@@ -158,9 +156,9 @@ void SpeedLoop()
     if (progress >= 0.99)
     {
         lcd.clear();
-        lcd.print(F("Success!"));
         isSpeedWaiting = true;
         speedWaitMillis = millis();
+        return GAME_WON;
     }
 
     if (millis() - roundStart > roundDuration)
@@ -178,4 +176,6 @@ void SpeedLoop()
     }
 
     lastMillis = millis();
+
+    return GAME_RUNNING;
 }
