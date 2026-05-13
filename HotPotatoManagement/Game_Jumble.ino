@@ -107,7 +107,6 @@ void ShuffleLetters()
 {
   char a = currentJumble[selectionOne];
   char b = currentJumble[selectionTwo];
-
   currentJumble.setCharAt(selectionOne, b);
   currentJumble.setCharAt(selectionTwo, a);
 
@@ -131,10 +130,8 @@ void UpdateDisplay()
       spacer[i] = ' ';
     }
     spacer[16] = '\0';
-
     spacer[selectionOne] = '^';
     spacer[selectionTwo] = '^';
-
     lcd.setCursor(0, 1);
     lcd.print(spacer);
     lcd.print(F("          ")); // see [note 1]
@@ -237,9 +234,7 @@ void UpdateMelody() {
   }
 
   int durationValue = pgm_read_word(&activeDuration[melodyIndex]);
-
   int melodyValue = pgm_read_word(&activeMelody[melodyIndex]);
-
   int noteDuration = dur / durationValue;
 
   tone(BUZZ_PIN, melodyValue, noteDuration);

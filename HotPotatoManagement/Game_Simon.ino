@@ -442,7 +442,6 @@ void checkInput(byte input)
 void handleLevelSuccess()
 {
     static bool initialized = false;
-
     long inputTimer = 0;
 
     if (!initialized)
@@ -450,10 +449,8 @@ void handleLevelSuccess()
         initialized = true;
 
         clearScreen();
-
         setRow(0, F("Good!"));
         setRow(1, F("Next round"));
-
         beep(TONE_SUCCESS, 200);
 
         simonTimer = millis();

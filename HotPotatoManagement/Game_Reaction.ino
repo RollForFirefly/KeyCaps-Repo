@@ -42,12 +42,10 @@ GameResult ReactionLoop() {
     case REACTION_WAIT_START:
 
       if (AnyPressed()) {
-
         lcd.clear();
         lcd.print(F("Get Ready"));
 
         reactionMillis = millis();
-
         reactionState = REACTION_DELAY;
       }
 
@@ -69,7 +67,6 @@ GameResult ReactionLoop() {
         }
 
         reactionMillis = millis();
-
         reactionState = REACTION_INPUT;
       }
 
@@ -82,7 +79,6 @@ GameResult ReactionLoop() {
         if (currentDirection == 0) {
 
           successCount++;
-
           tone(BUZZ_PIN, 1000, 100);
 
           if (successCount >= requiredSuccess) {
@@ -102,13 +98,12 @@ GameResult ReactionLoop() {
         if (currentDirection == 1) {
 
           successCount++;
-
           tone(BUZZ_PIN, 1000, 100);
 
           if (successCount >= requiredSuccess) {
             return GAME_WON;
           }
-
+          
           reactionState = REACTION_DELAY;
           reactionMillis = millis();
         }
