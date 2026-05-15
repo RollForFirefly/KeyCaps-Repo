@@ -1,6 +1,6 @@
 // Game settings
 const byte MAX_SEQUENCE = 32;
-const byte TARGET_SEQUENCE_LENGTH = 4; // TODO: Change this, probably based on game state? Or is it always the same?
+const byte TARGET_SEQUENCE_LENGTH = 5; // TODO: Change this, probably based on game state? Or is it always the same?
 
 byte sequence[(MAX_SEQUENCE + 7) / 8];
 byte sequenceLength = 1;

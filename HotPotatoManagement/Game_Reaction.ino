@@ -53,7 +53,7 @@ GameResult ReactionLoop() {
 
     case REACTION_DELAY:
   
-      if (millis() - reactionMillis >= 800) {
+      if (millis() - reactionMillis >= 900) {
         currentDirection = random(0, 2);
 
         lcd.clear();
