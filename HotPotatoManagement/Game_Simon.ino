@@ -1,6 +1,6 @@
 // Game settings
 const byte MAX_SEQUENCE = 32;
-const byte TARGET_SEQUENCE_LENGTH = 6; // TODO: Change this, probably based on game state? Or is it always the same?
+const byte TARGET_SEQUENCE_LENGTH = 4; // TODO: Change this, probably based on game state? Or is it always the same?
 
 byte sequence[(MAX_SEQUENCE + 7) / 8];
 byte sequenceLength = 1;
@@ -43,6 +43,7 @@ enum SimonState : byte
 
 SimonState simonState = SHOWING_SEQUENCE;
 bool inputArmed = false;
+bool isGameComplete = false;
 
 unsigned long simonTimer = 0;
 unsigned long sequenceTimer = 0;
@@ -347,59 +348,14 @@ void showFailureFeedback(byte input)
 // Input
 int readButtonPress()
 {
-    bool left = LeftPressed();
-    bool right = RightPressed();
-
-    if (!inputArmed)
-    {
-        if (!left && !right)
-        {
-            if (!WaitWithoutDelay(inputTimer, INPUT_ARM_DELAY)) {
-                return -1;
-            }
-
-            if (!LeftPressed() && !RightPressed())
-            {
-                inputArmed = true;
-                Serial.println(F("Input armed. Waiting for fresh button press."));
-            }
-        }
-
-        return -1;
+    if (LeftJustPressed()) {
+        Serial.println(F("LEFT pressed"));
+        return 0;
     }
 
-    left = LeftPressed();
-    right = RightPressed();
-
-    if (left && right)
-    {
-        Serial.println(F("Both buttons detected. Ignoring input."));
-        inputArmed = false;
-        return -1;
-    }
-
-    if (left)
-    {
-        if (!WaitWithoutDelay(simonTimer, DEBOUNCE_DELAY)) {
-            return -1;
-        }
-
-        if (LeftPressed() && !RightPressed())
-        {
-            Serial.println(F("Fresh LEFT press detected."));
-            inputArmed = false;
-            return 0;
-        }
-    }
-
-    if (right)
-    {
-        if (RightPressed() && !LeftPressed())
-        {
-            Serial.println(F("Fresh RIGHT press detected."));
-            inputArmed = false;
-            return 1;
-        }
+    if (RightJustPressed()) {
+        Serial.println(F("RIGHT pressed"));
+        return 1;
     }
 
     return -1;
@@ -444,6 +400,13 @@ void handleLevelSuccess()
     static bool initialized = false;
     long inputTimer = 0;
 
+    if (sequenceLength >= TARGET_SEQUENCE_LENGTH)
+    {
+        simonState = GAME_COMPLETE;
+        long inputTimer = 0;
+        return;
+    }
+
     if (!initialized)
     {
         initialized = true;
@@ -467,12 +430,7 @@ void handleLevelSuccess()
 
     sequenceLength++;
 
-    if (sequenceLength > TARGET_SEQUENCE_LENGTH)
-    {
-        simonState = GAME_COMPLETE;
-        long inputTimer = 0;
-        return;
-    }
+    
 
     generateStep(sequenceLength - 1);
 
@@ -492,8 +450,8 @@ void handleGameComplete()
     {
     case 0:
         clearScreen();
-        setRow(0, F("Complete!"));
-        setRow(1, F("Nice work"));
+        setRow(0, F("Simon Complete!"));
+        setRow(1, F("Next up..."));
         beep(1400, 200);
 
         simonTimer = millis();
@@ -504,6 +462,7 @@ void handleGameComplete()
         if (millis() - simonTimer >= COMPLETE_DELAY)
         {
             phase = 0;
+            isGameComplete = true;
         }
         break;
     }
@@ -518,6 +477,8 @@ void SimonSetup()
     digitalWrite(BUZZ_PIN, LOW);
     lcd.createChar(0, arrowLeft);
     lcd.createChar(1, arrowRight);
+
+    isGameComplete = false;
 
     startNewGame();
 }
@@ -554,7 +515,9 @@ GameResult SimonLoop()
 
     case GAME_COMPLETE:
         handleGameComplete();
-        return GAME_WON;
+        if (isGameComplete) {
+            return GAME_WON;
+        }
     }
 
     return GAME_RUNNING;

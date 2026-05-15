@@ -5,8 +5,8 @@ float baseline = 0.0;
 
 // Tunable parameters
 float accelThreshold = 0.10;   
-float progressGain = 0.015;    
-float progressDecay = 0.015;  
+float progressGain = 0.0015;    
+float progressDecay = 0.0015;  
 float smoothing = 0.6;         
 
 unsigned long roundStart = 0;
@@ -98,7 +98,9 @@ GameResult SpeedLoop() {
     // Check win
     if (progress >= 0.99) {
         lcd.clear();
-        lcd.print(F("Round Complete!"));
+        lcd.print(F("Speed Complete!"));
+        lcd.setCursor(0, 1);
+        lcd.print(F("Next up..."));
         isSpeedWaiting = true;
         speedWaitMillis = millis();
         return GAME_WON;

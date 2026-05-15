@@ -73,10 +73,10 @@ GameResult ShakeLoop() {
     if (shakeCount >= 50) {
       tone(BUZZ_PIN, 1000, 500);   // buzzer 1000Hz, 500ms
       lcd.setCursor(0, 0);
-      lcd.print(F("50 Shakes!"));
+      lcd.print(F("50/50 Complete!"));
       lcd.print(F("          "));
       lcd.setCursor(0, 1);
-      lcd.print(F("Well done!"));
+      lcd.print(F("Next up..."));
       lcd.print(F("          "));
 
       counting = false;

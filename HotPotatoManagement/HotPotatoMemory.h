@@ -46,33 +46,33 @@ extern ButtonState leftButton;
 extern ButtonState rightButton;
 
 inline void UpdateButtons() {
-  leftButton.previous = leftButton.current;
-  rightButton.previous = rightButton.current;
+    leftButton.previous = leftButton.current;
+    rightButton.previous = rightButton.current;
 
-  leftButton.current = digitalRead(LEFT_B_PIN) == LOW;
-  rightButton.current = digitalRead(RIGHT_B_PIN) == LOW;
+    leftButton.current = digitalRead(LEFT_B_PIN) == LOW;
+    rightButton.current = digitalRead(RIGHT_B_PIN) == LOW;
 }
 
 inline bool LeftPressed() {
-  return leftButton.current;
+    return leftButton.current;
 }
 
 inline bool RightPressed() {
-  return rightButton.current;
+    return rightButton.current;
 }
 
 inline bool LeftJustPressed() {
-  return leftButton.current && !leftButton.previous;
+    return (leftButton.current && !leftButton.previous);
 }
 
 inline bool RightJustPressed() {
-  return rightButton.current && !rightButton.previous;
+    return (rightButton.current && !rightButton.previous);
 }
 
 inline bool AnyPressed() {
-  return LeftPressed() || RightPressed();
+    return LeftPressed() || RightPressed();
 }
 
 inline bool AnyJustPressed() {
-  return LeftJustPressed() || RightJustPressed();
+    return LeftJustPressed() || RightJustPressed();
 }

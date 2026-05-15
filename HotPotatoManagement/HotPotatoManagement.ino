@@ -49,6 +49,9 @@ void setup() {
   gameState = MAIN_MENU;
 
   MenuSetup();
+  UpdateButtons();
+  leftButton.previous = leftButton.current;
+  rightButton.previous = rightButton.current;
 }
 
 void SetupGame() {
@@ -149,20 +152,9 @@ void MenuSetup() {
 }
 
 void MenuLoop() {
-  if (menuWaitingForRelease) {
-    if (!AnyPressed()) {
-      menuWaitingForRelease = false; 
-    }
-    return;
-  }
-
-  if (HasReceivedInput()) {
+  if (AnyJustPressed()) {
     GoNextGame();
   }
-}
-
-bool HasReceivedInput() {
-  return AnyJustPressed();
 }
 
 GameResult GameLoop() {

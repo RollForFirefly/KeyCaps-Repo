@@ -139,9 +139,10 @@ void UpdateDisplay()
   else if (jumbleState == WIN)
   {
     lcd.setCursor(0, 0);
-    lcd.print(F("YOU WIN!"));
+    lcd.print(F("Jumble Complete!"));
     lcd.print(F("          "));
     lcd.setCursor(0, 1);
+    lcd.print(F("Next up..."));
     lcd.print(F("          "));
 
     hasJumbleWon = true;
@@ -173,31 +174,18 @@ void MoveSelection()
 
 void ReadInput()
 {
-  int LB = digitalRead(LEFT_B_PIN);
-  int RB = digitalRead(RIGHT_B_PIN);
-
-  if (LB != leftButtonState)
+  if (LeftJustPressed() && jumbleState == PLAY)
   {
-    leftButtonState = LB;
-    DebugJumble(F("Left button state: "), String(leftButtonState));
-
-    if (LeftPressed() && jumbleState == PLAY)
-    {
-      ShuffleLetters();
-      UpdateDisplay();
-    }
+    ShuffleLetters();
+    UpdateDisplay();
+    DebugJumble(F("Jumble Left Pressed"));
   }
-
-  if (RB != rightButtonState)
+  
+  if (RightJustPressed() && jumbleState == PLAY)
   {
-    rightButtonState = RB;
-    DebugJumble(F("Right button state: "), String(rightButtonState));
-
-    if (RightPressed() && jumbleState == PLAY)
-    {
-      MoveSelection();
-      UpdateDisplay();
-    }
+    MoveSelection();
+    UpdateDisplay();
+    DebugJumble(F("Jumble Right Pressed"));
   }
 }
 
