@@ -1,126 +1,76 @@
-bool lastButtonState = HIGH;
 
-// TODO: Test and tune
-// --- Tunable parameters ---
-float accelThreshold = 0.7;
-float progress = 0.0;
-float progressGain = 0.015;
-float progressDecay = 0.015;
-float smoothing = 0.85;
-float penalty = 0.20;
+float progress = 0.0;          
+float smoothedAccel = 0.0;     
+float baseline = 0.0;         
 
-// Direction tracking
-float smoothedAccel = 0;
-int lastDirection = 0;
+// Tunable parameters
+float accelThreshold = 0.10;   
+float progressGain = 0.015;    
+float progressDecay = 0.015;  
+float smoothing = 0.6;         
 
-// Baseline for stationary device
-float baseline = 0;
-
-// TODO: Move
-// Temporary round control (will move out later)
-unsigned long roundStart;
+unsigned long roundStart = 0;
 unsigned long roundDuration = 10000; // 10 seconds
-
 bool isSpeedWaiting = false;
 unsigned long speedWaitMillis = 0;
 
-// --- Setup ---
-void SpeedSetup()
-{
-    Serial.begin(9600);
+// --- Speed Game Setup ---
+void SpeedSetup() {
     Wire.begin();
-
-    pinMode(RIGHT_B_PIN, INPUT_PULLUP);
-
-    lcd.begin(16, 2);
-    lcd.setRGB(0, 128, 255);
-
     accelemeter.init();
-    delay(1000);
+    delay(500);
 
-    // --- Measure baseline for magnitude at rest ---
+    // Measure baseline at rest
     float ax, ay, az;
     accelemeter.getAcceleration(&ax, &ay, &az);
-    baseline = sqrt(ax * ax + ay * ay + az * az);
-    Serial.print(F("Baseline magnitude: "));
+    baseline = sqrt(ax*ax + ay*ay + az*az);
+    Serial.print(F("Speed baseline: "));
     Serial.println(baseline);
 
     startRound();
 }
 
-// --- Start round ---
-void startRound()
-{
-    progress = 0;
-    lastDirection = 0;
-    smoothedAccel = 0;
+void startRound() {
+    progress = 0.0;
+    smoothedAccel = 0.0;
     roundStart = millis();
 
     lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("Keep moving!"));
 }
 
-// --- Update minigame logic ---
-void updateMinigame()
-{
+// --- Update Speed Game Progress ---
+void updateSpeedGame() {
     float ax, ay, az;
     accelemeter.getAcceleration(&ax, &ay, &az);
 
-    // Combine axes into magnitude
-    float magnitude = sqrt(ax * ax + ay * ay + az * az);
+    // Acceleration magnitude
+    float magnitude = sqrt(ax*ax + ay*ay + az*az);
+    float raw = fabs(magnitude - baseline); // absolute difference from baseline
 
-    // Remove baseline
-    float raw = magnitude - baseline;
-
-    // Smooth signal
+    // Smooth the signal
     smoothedAccel = smoothing * smoothedAccel + (1 - smoothing) * raw;
 
-    // Direction detection (active vs not)
-    int direction = 0;
-    if (smoothedAccel > accelThreshold)
-        direction = 1;
-    else
-        direction = 0;
-
-    // Progress logic
-    if (direction == 1)
-    {
-        if (lastDirection == 1 || lastDirection == 0)
-        {
-            progress += progressGain;
-        }
-        else
-        {
-            progress -= penalty; // penalty for breaking momentum
-        }
-    }
-    else
-    {
+    // Increase or decay progress
+    if (smoothedAccel > accelThreshold) {
+        progress += progressGain * smoothedAccel * 10; // scale by magnitude
+    } else {
         progress -= progressDecay;
     }
 
-    // Clamp
-    if (progress < 0)
-        progress = 0;
-    if (progress > 1)
-        progress = 1;
+    progress = constrain(progress, 0.0, 1.0);
 
-    lastDirection = direction;
-
-    // --- SERIAL PLOTTER OUTPUT ---
-    Serial.print(raw);
-    Serial.print(',');
-    Serial.print(smoothedAccel);
-    Serial.print(',');
-    Serial.print(accelThreshold);
-    Serial.print(',');
-    Serial.println(progress);
+    // Debug
+    Serial.print(F("raw:")); Serial.print(raw);
+    Serial.print(F(" smoothed:")); Serial.print(smoothedAccel);
+    Serial.print(F(" progress:")); Serial.println(progress);
 }
 
-// --- Draw UI ---
-void drawUI()
-{
+// --- Draw Speed Game UI ---
+void drawSpeedUI() {
     lcd.setCursor(0, 0);
-    lcd.print(F("Keep moving   "));
+    lcd.print(F("Keep moving!  "));
 
     lcd.setCursor(0, 1);
     lcd.print(F("Prog:"));
@@ -128,54 +78,40 @@ void drawUI()
     lcd.print(F("%   "));
 }
 
-// --- Main loop ---
-void SpeedLoop()
-{
+// --- Speed Game Loop ---
+GameResult SpeedLoop() {
+    if (hasExploded) return GAME_RUNNING;
+
+    // Waiting between rounds
     if (isSpeedWaiting) {
         if (millis() - speedWaitMillis >= 1500) {
             isSpeedWaiting = false;
             startRound();
         }
-
-        return;
+        return GAME_RUNNING;
     }
 
-    // --- Button edge detect ---
-    bool buttonState = digitalRead(RIGHT_B_PIN);
+    // --- Update progress ---
+    updateSpeedGame();
+    drawSpeedUI();
 
-    if (lastButtonState == HIGH && buttonState == LOW)
-    {
-        startRound(); // restart on press
-    }
-
-    lastButtonState = buttonState;
-
-    updateMinigame();
-    drawUI();
-
-    // TODO: Handle elsewhere
-    // --- Temporary round handling ---
-    if (progress >= 0.99)
-    {
+    // Check win
+    if (progress >= 0.99) {
         lcd.clear();
-        lcd.print(F("Success!"));
+        lcd.print(F("Round Complete!"));
         isSpeedWaiting = true;
         speedWaitMillis = millis();
+        return GAME_WON;
     }
 
-    if (millis() - roundStart > roundDuration)
-    {
+    // Check round timeout
+    if (millis() - roundStart > roundDuration) {
         lcd.clear();
         lcd.print(F("Time up!"));
         isSpeedWaiting = true;
         speedWaitMillis = millis();
+        return GAME_LOST;
     }
 
-    static unsigned long lastMillis = 0;
-
-    if (millis() - lastMillis < 50) {
-        return;
-    }
-
-    lastMillis = millis();
+    return GAME_RUNNING;
 }

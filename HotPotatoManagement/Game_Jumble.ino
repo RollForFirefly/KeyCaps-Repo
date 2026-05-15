@@ -57,7 +57,7 @@ bool isMelodyPlaying = false;
 // --- Forward declarations
 void UpdateDisplay();
 void JumbleSetup();
-void JumbleLoop();
+GameResult JumbleLoop();
 void ShuffleLetters();
 void MoveSelection();
 void RestartJumble();
@@ -66,13 +66,8 @@ bool CheckJumble();
 void DebugJumble(String debugMsg, String debugVar = "");
 void PlayTune(JumbleTunes jumbleTune);
 
-void extern GoNextGame();
-
 void JumbleSetup()
 {
-  pinMode(LEFT_B_PIN, INPUT);
-  pinMode(RIGHT_B_PIN, INPUT);
-  Serial.begin(9600);
 
   // Choose a random jumble
   int randNum = random(0, 3);
@@ -112,7 +107,6 @@ void ShuffleLetters()
 {
   char a = currentJumble[selectionOne];
   char b = currentJumble[selectionTwo];
-
   currentJumble.setCharAt(selectionOne, b);
   currentJumble.setCharAt(selectionTwo, a);
 
@@ -131,12 +125,13 @@ void UpdateDisplay()
     lcd.print(F("          ")); // [note 1]: to replace any leftover characters with whitespace so we avoid the screen flicker
 
     // Second line: cursor indicators
-    String spacer = F("");
-    for (int i = 0; i < currentJumble.length(); i++)
-      spacer += F(" "); // initialize with spaces
-    spacer.setCharAt(selectionOne, '^');
-    spacer.setCharAt(selectionTwo, '^');
-
+    char spacer[17];
+    for (int i = 0; i < 16; i++) {
+      spacer[i] = ' ';
+    }
+    spacer[16] = '\0';
+    spacer[selectionOne] = '^';
+    spacer[selectionTwo] = '^';
     lcd.setCursor(0, 1);
     lcd.print(spacer);
     lcd.print(F("          ")); // see [note 1]
@@ -186,7 +181,7 @@ void ReadInput()
     leftButtonState = LB;
     DebugJumble(F("Left button state: "), String(leftButtonState));
 
-    if (leftButtonState == HIGH && jumbleState == PLAY)
+    if (LeftPressed() && jumbleState == PLAY)
     {
       ShuffleLetters();
       UpdateDisplay();
@@ -198,7 +193,7 @@ void ReadInput()
     rightButtonState = RB;
     DebugJumble(F("Right button state: "), String(rightButtonState));
 
-    if (rightButtonState == HIGH && jumbleState == PLAY)
+    if (RightPressed() && jumbleState == PLAY)
     {
       MoveSelection();
       UpdateDisplay();
@@ -210,7 +205,7 @@ void PlayTune(JumbleTunes jumbleTune) {
   tone(BUZZ_PIN, (int) jumbleTune, dur / tuneDuration);
 }
 
-void StartMelody(int melody[], int duration[], int len) {
+void StartMelody(const int melody[], const int duration[], int len) {
   activeMelody = melody;
   activeDuration = duration;
 
@@ -239,9 +234,7 @@ void UpdateMelody() {
   }
 
   int durationValue = pgm_read_word(&activeDuration[melodyIndex]);
-
   int melodyValue = pgm_read_word(&activeMelody[melodyIndex]);
-
   int noteDuration = dur / durationValue;
 
   tone(BUZZ_PIN, melodyValue, noteDuration);
@@ -251,12 +244,15 @@ void UpdateMelody() {
   melodyIndex++;
 }
 
-void JumbleLoop()
-{
+GameResult  JumbleLoop() {
+  if (hasExploded) {
+    return GAME_RUNNING;
+  }
+
   if (hasJumbleWon) {
     if (millis() - jumbleWinMillis >= 3000) {
       hasJumbleWon = false;
-      GoNextGame();
+      return GAME_WON;
     }
   }
 
@@ -271,7 +267,12 @@ void JumbleLoop()
     StartMelody(victoryMelody, victoryDuration, vicLen);
   }
 
-  ReadInput();
+  if (jumbleState == PLAY) {
+    ReadInput();
+  }
+  
 
   UpdateMelody();
+
+  return GAME_RUNNING;
 }
