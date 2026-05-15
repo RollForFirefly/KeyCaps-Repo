@@ -18,6 +18,7 @@
 extern unsigned long timerRemaining;
 extern unsigned long lastTimerMillis;
 extern const unsigned long timerMaxTime;
+extern const unsigned long instructionMaxTime;
 
 // hardware components
 extern Grove_LED_Bar bar;

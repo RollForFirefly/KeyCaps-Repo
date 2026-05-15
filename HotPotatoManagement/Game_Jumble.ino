@@ -122,7 +122,7 @@ void UpdateDisplay()
     // First line: current jumble
     lcd.setCursor(0, 0);
     lcd.print(currentJumble);
-    lcd.print(F("          ")); // [note 1]: to replace any leftover characters with whitespace so we avoid the screen flicker
+    lcd.print(F("          ")); // [note 1]: to replace any leftover characters with whitespace so we avoid the screen flicker. it's kind of a dumb solution but oh well.
 
     // Second line: cursor indicators
     char spacer[17];

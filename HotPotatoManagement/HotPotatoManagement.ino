@@ -125,7 +125,7 @@ void WriteInstructions() {
     lcd.print(instructLineTwo);
   }
 
-  if (millis() - instructionMillis >= 4000) {
+  if (millis() - instructionMillis >= instructionMaxTime) {
     isInstructionScreenActive = false;
     isLoading = false;
     SetupGame();
@@ -144,7 +144,7 @@ void MenuSetup() {
   bar.setLevel(0);
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(F("HOT POTATO V0.3"));
+  lcd.print(F("HOT POTATO V0.4"));
   lcd.setCursor(0, 1);
   lcd.print(F("L/R to start..."));
 
