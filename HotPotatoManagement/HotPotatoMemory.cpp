@@ -1,8 +1,8 @@
 #include "HotPotatoMemory.h"
 
-unsigned long timerRemaining = 60000;
+unsigned long timerRemaining = 90000;
 unsigned long lastTimerMillis = 0;
-const unsigned long timerMaxTime = 60000;
+const unsigned long timerMaxTime = 90000;
 
 Grove_LED_Bar bar(9, BAR_PIN, 0);
 MMA7660 accelemeter;

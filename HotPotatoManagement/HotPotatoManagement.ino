@@ -85,28 +85,28 @@ void WriteInstructions() {
 
     switch (gameState) {
       case JUMBLE_GAME:
-        instructLineOne = F("Unshuffle JUMBLE");
+        instructLineOne = F("Unjumble!");
         instructLineTwo = F("L:Swap  R:Move");
         break;
 
       case SHAKE_GAME:
-        instructLineOne = F("Shake me fast");
-        instructLineTwo = F("L/R: Start");
+        instructLineOne = F("Ready to shake?");
+        instructLineTwo = F("");
         break;
 
       case SIMON_GAME:
-        instructLineOne = F("Simon Says");
-        instructLineTwo = F("...");
+        instructLineOne = F("Simon Says...");
+        instructLineTwo = F("L:Left  R:Right");
         break;
       
       case REACTION_GAME:
         instructLineOne = F("React fast!");
-        instructLineTwo = F("...");
+        instructLineTwo = F("L:Left  R:Right");
         break;
 
       case SPEED_GAME:
-        instructLineOne = F("Be quick!");
-        instructLineTwo = F("...");
+        instructLineOne = F("Ready to run?");
+        instructLineTwo = F("");
         break;
 
       default:
@@ -122,7 +122,7 @@ void WriteInstructions() {
     lcd.print(instructLineTwo);
   }
 
-  if (millis() - instructionMillis >= 3000) {
+  if (millis() - instructionMillis >= 4000) {
     isInstructionScreenActive = false;
     isLoading = false;
     SetupGame();
@@ -217,7 +217,7 @@ void NoGameFound() {
   lcd.setCursor(0, 0);
   lcd.print(F("NO GAME FOUND"));
   lcd.setCursor(0, 1);
-  lcd.print(F("RETURNING TO MENU."));
+  lcd.print(F("EXITING..."));
 
   delay(3000);
   MenuSetup();
@@ -278,6 +278,8 @@ void BoomScreen() {
     lcd.print(F("YOU BLEW UP"));
     lcd.setCursor(0, 1);
     lcd.print(F("L:Menu R:Retry"));
+
+    tone(BUZZ_PIN, 550, 1500);
   }
 
   if (LeftJustPressed()) {
